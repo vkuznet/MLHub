@@ -6,7 +6,9 @@ functionality:
 ```
                    | -> TFaaS
 client --> MLHub --| -> PyTorch
-                   | -> Keras+ScikitLearn
+             |     | -> Keras+ScikitLearn
+             |
+             |--------> MetaData service
 ```
 Each ML backend server may have different set of APIs and MLHub provides
 an uniform way to query these services. So far we support the following APIs:
