@@ -17,9 +17,9 @@ import (
 
 // Record define ML mongo record
 type Record struct {
-	Meta map[string]interface{} // meta-data information about ML model
-	Name string                 // model name
-	Type string                 // model type
+	Meta map[string]interface{} `json:"meta"` // meta-data information about ML model
+	Name string                 `json:"name"` // model name
+	Type string                 `json:"type"` // model type
 }
 
 // ToJSON provides string representation of Record
