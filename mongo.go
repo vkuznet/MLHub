@@ -17,10 +17,9 @@ import (
 
 // Record define ML mongo record
 type Record struct {
-	Meta    map[string]interface{}
-	Model   string
-	Version string
-	Blob    []byte
+	Meta map[string]interface{} // meta-data information about ML model
+	Name string                 // model name
+	Type string                 // model type
 }
 
 // ToJSON provides string representation of Record
@@ -39,7 +38,7 @@ type MongoConnection struct {
 func (m *MongoConnection) Connect() *mgo.Session {
 	var err error
 	if m.Session == nil {
-		m.Session, err = mgo.Dial(Config.URI)
+		m.Session, err = mgo.Dial(Config.DBURI)
 		if err != nil {
 			panic(err)
 		}
@@ -70,7 +69,7 @@ func MongoUpsert(dbname, collname string, records []Record) error {
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
 	for _, rec := range records {
-		model := rec.Model
+		model := rec.Name
 		if model == "" {
 			log.Printf("no model, record %v\n", rec)
 			continue

@@ -6,8 +6,11 @@ package main
 //
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 // FaviconHandler
@@ -28,7 +31,18 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 }
 func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: implement models API from all backend servers
-	RequestHandler(w, r)
+	// for now we'll query MetaData server (MongoDB) and fetch information
+	// about all ML models
+	spec := bson.M{}
+	records := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+	data, err := json.Marshal(records)
+	if err != nil {
+		w.Write([]byte(fmt.Sprintf("unable to marshal data, error=%v", err)))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+	return
 }
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: implement status API from all backend servers

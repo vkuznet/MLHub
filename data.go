@@ -19,5 +19,7 @@ type Configuration struct {
 	DomainNames         []string `json:"domain_names"`           // list of domain names to use for LetsEncrypt
 	StaticDir           string   `json:"staticDir"`              // speficy static dir location
 	LimiterPeriod       string   `json:"rate"`                   // github.com/ulule/limiter rate value
-	URI                 string   `json:"uri"`                    // meta-data server URI
+	DBURI               string   `json:"db_uri"`                 // meta-data server URI
+	DBName              string   `json:"db_name"`                // meta-data database name
+	DBColl              string   `json:"db_collection"`          // meta-data database collection name
 }
