@@ -4,11 +4,11 @@ functionality:
 - MetaData service for pre-trained ML models
 - A reverse proxy to different MLaaS backends:
 ```
-                        | -> TFaaS
-client --> MLaaSProxy --| -> PyTorch
-                        | -> Keras+ScikitLearn
+                   | -> TFaaS
+client --> MLHub --| -> PyTorch
+                   | -> Keras+ScikitLearn
 ```
-Each ML backend server may have different set of APIs and MLaaSProxy provides
+Each ML backend server may have different set of APIs and MLHub provides
 an uniform way to query these services. So far we support the following APIs:
 - `/upload` to upload ML tarball, POST HTTP request with ML model payload, e.g.
 ```
