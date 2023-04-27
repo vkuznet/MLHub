@@ -1,5 +1,8 @@
-# MLaaSProxy
-A reverse proxy server for MLaaS backends:
+# MLHub
+MLHub represents a hub for different MLaaS backends. It provides the following
+functionality:
+- MetaData service for pre-trained ML models
+- A reverse proxy to different MLaaS backends:
 ```
                         | -> TFaaS
 client --> MLaaSProxy --| -> PyTorch
