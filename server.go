@@ -154,10 +154,10 @@ func MLaaSProxyServer() {
 			Addr:      ":https",
 			TLSConfig: tlsConfig,
 		}
-		log.Println("Start HTTPs server with", Config.ServerCrt, Config.ServerKey)
+		log.Printf("Start HTTPs server with %s and %s on :%d", Config.ServerCrt, Config.ServerKey, Config.Port)
 		log.Fatal(server.ListenAndServeTLS(Config.ServerCrt, Config.ServerKey))
 	} else {
-		log.Println("Start HTTP server")
+		log.Printf("Start HTTP server on :%d", Config.Port)
 		http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), nil)
 	}
 }
