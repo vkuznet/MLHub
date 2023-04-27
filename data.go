@@ -21,5 +21,5 @@ type Configuration struct {
 	LimiterPeriod       string   `json:"rate"`                   // github.com/ulule/limiter rate value
 	DBURI               string   `json:"db_uri"`                 // meta-data server URI
 	DBName              string   `json:"db_name"`                // meta-data database name
-	DBColl              string   `json:"db_collection"`          // meta-data database collection name
+	DBColl              string   `json:"db_coll"`                // meta-data database collection name
 }
