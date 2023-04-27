@@ -13,35 +13,35 @@ vet:
 	go vet .
 
 build:
-	go clean; rm -rf pkg; CGO_ENABLED=0 go build -o mlaas-proxy ${flags}
+	go clean; rm -rf pkg; CGO_ENABLED=0 go build -o mlhub ${flags}
 
 build_debug:
-	go clean; rm -rf pkg; CGO_ENABLED=0 go build -o mlaas-proxy ${flags} -gcflags="-m -m"
+	go clean; rm -rf pkg; CGO_ENABLED=0 go build -o mlhub ${flags} -gcflags="-m -m"
 
 build_amd64: build_linux
 
 build_darwin:
-	go clean; rm -rf pkg mlaas-proxy; GOOS=darwin CGO_ENABLED=0 go build -o mlaas-proxy ${flags}
+	go clean; rm -rf pkg mlhub; GOOS=darwin CGO_ENABLED=0 go build -o mlhub ${flags}
 
 build_linux:
-	go clean; rm -rf pkg mlaas-proxy; GOOS=linux CGO_ENABLED=0 go build -o mlaas-proxy ${flags}
+	go clean; rm -rf pkg mlhub; GOOS=linux CGO_ENABLED=0 go build -o mlhub ${flags}
 	mkdir -p /tmp/auth-proxy-tools/amd64
-	cp mlaas-proxy /tmp/auth-proxy-tools/amd64
+	cp mlhub /tmp/auth-proxy-tools/amd64
 
 build_power8:
-	go clean; rm -rf pkg mlaas-proxy; GOARCH=ppc64le GOOS=linux CGO_ENABLED=0 go build -o mlaas-proxy ${flags}
+	go clean; rm -rf pkg mlhub; GOARCH=ppc64le GOOS=linux CGO_ENABLED=0 go build -o mlhub ${flags}
 	mkdir -p /tmp/auth-proxy-tools/power8
-	cp mlaas-proxy /tmp/auth-proxy-tools/power8
+	cp mlhub /tmp/auth-proxy-tools/power8
 
 build_arm64:
-	go clean; rm -rf pkg mlaas-proxy; GOARCH=arm64 GOOS=linux CGO_ENABLED=0 go build -o mlaas-proxy ${flags}
+	go clean; rm -rf pkg mlhub; GOARCH=arm64 GOOS=linux CGO_ENABLED=0 go build -o mlhub ${flags}
 	mkdir -p /tmp/auth-proxy-tools/arm64
-	cp mlaas-proxy /tmp/auth-proxy-tools/arm64
+	cp mlhub /tmp/auth-proxy-tools/arm64
 
 build_windows:
-	go clean; rm -rf pkg mlaas-proxy; GOARCH=amd64 GOOS=windows CGO_ENABLED=0 go build -o mlaas-proxy ${flags}
+	go clean; rm -rf pkg mlhub; GOARCH=amd64 GOOS=windows CGO_ENABLED=0 go build -o mlhub ${flags}
 	mkdir -p /tmp/auth-proxy-tools/windows
-	cp mlaas-proxy /tmp/auth-proxy-tools/windows
+	cp mlhub /tmp/auth-proxy-tools/windows
 
 install:
 	go install
