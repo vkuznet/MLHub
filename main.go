@@ -45,7 +45,7 @@ func main() {
 	// configure logger with log time, filename, and line number
 	log.SetFlags(0)
 	if Config.Verbose > 0 {
-		log.SetFlags(log.Lshortfile)
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
 
 	if Config.Verbose > 0 {

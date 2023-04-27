@@ -87,8 +87,7 @@ func logRequest(w http.ResponseWriter, r *http.Request, start time.Time, status 
 		log.Println("unable to unescape request uri", err)
 		uri = r.RequestURI
 	}
-	t := time.Now().Format(time.RFC3339)
-	log.Printf("%s %s %d %s %s %s %s %s %s\n", t, r.Proto, status, addr, r.Method, uri, dataMsg, refMsg, respMsg)
+	log.Printf("%s %d %s %s %s %s %s %s\n", r.Proto, status, addr, r.Method, uri, dataMsg, refMsg, respMsg)
 	/*
 		rec := LogRecord{
 			Method:         r.Method,
