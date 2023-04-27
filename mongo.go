@@ -35,17 +35,17 @@ type MongoConnection struct {
 }
 
 // Connect provides connection to MongoDB
-func (m *MongoConnection) Connect() *mgo.Session {
+func (m *MongoConnection) Connect() (*mgo.Session, error) {
 	var err error
 	if m.Session == nil {
 		m.Session, err = mgo.Dial(Config.DBURI)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		//         m.Session.SetMode(mgo.Monotonic, true)
 		m.Session.SetMode(mgo.Strong, true)
 	}
-	return m.Session.Clone()
+	return m.Session.Clone(), nil
 }
 
 // global object which holds MongoDB connection
@@ -53,7 +53,11 @@ var _Mongo MongoConnection
 
 // MongoInsert records into MongoDB
 func MongoInsert(dbname, collname string, records []Record) {
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
 	for _, rec := range records {
@@ -65,7 +69,11 @@ func MongoInsert(dbname, collname string, records []Record) {
 
 // MongoUpsert records into MongoDB
 func MongoUpsert(dbname, collname string, records []Record) error {
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return err
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
 	for _, rec := range records {
@@ -86,10 +94,13 @@ func MongoUpsert(dbname, collname string, records []Record) error {
 // MongoGet records from MongoDB
 func MongoGet(dbname, collname string, spec bson.M, idx, limit int) []Record {
 	out := []Record{}
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return out
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
-	var err error
 	if limit > 0 {
 		err = c.Find(spec).Skip(idx).Limit(limit).All(&out)
 	} else {
@@ -104,10 +115,14 @@ func MongoGet(dbname, collname string, spec bson.M, idx, limit int) []Record {
 // MongoGetSorted records from MongoDB sorted by given key
 func MongoGetSorted(dbname, collname string, spec bson.M, skeys []string) []Record {
 	out := []Record{}
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return out
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
-	err := c.Find(spec).Sort(skeys...).All(&out)
+	err = c.Find(spec).Sort(skeys...).All(&out)
 	if err != nil {
 		log.Printf("Unable to sort records, error %v\n", err)
 		// try to fetch all unsorted data
@@ -130,10 +145,14 @@ func sel(q ...string) (r bson.M) {
 
 // MongoUpdate inplace for given spec
 func MongoUpdate(dbname, collname string, spec, newdata bson.M) {
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
-	err := c.Update(spec, newdata)
+	err = c.Update(spec, newdata)
 	if err != nil {
 		log.Printf("Unable to update record, spec %v, data %v, error %v\n", spec, newdata, err)
 	}
@@ -141,7 +160,11 @@ func MongoUpdate(dbname, collname string, spec, newdata bson.M) {
 
 // MongoCount gets number records from MongoDB
 func MongoCount(dbname, collname string, spec bson.M) int {
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return 0
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
 	nrec, err := c.Find(spec).Count()
@@ -153,10 +176,14 @@ func MongoCount(dbname, collname string, spec bson.M) int {
 
 // MongoRemove records from MongoDB
 func MongoRemove(dbname, collname string, spec bson.M) {
-	s := _Mongo.Connect()
+	s, err := _Mongo.Connect()
+	if err != nil {
+		log.Println("Unable to connect to MongoDB", err)
+		return
+	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
-	_, err := c.RemoveAll(spec)
+	_, err = c.RemoveAll(spec)
 	if err != nil && err != mgo.ErrNotFound {
 		log.Printf("Unable to remove records, spec %v, error %v\n", spec, err)
 	}
