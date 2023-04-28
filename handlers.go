@@ -78,8 +78,39 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 // PutHandler handles PUT HTTP requests, this request will
 // update ML model in backend or MetaData database
 func PutHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement upload API from all backend servers
-	RequestHandler(w, r)
+	vars := mux.Vars(r)
+	if model, ok := vars["model"]; ok {
+		if Config.Verbose > 0 {
+			log.Printf("update ML model %s", model)
+		}
+		// parse input JSON body
+		decoder := json.NewDecoder(r.Body)
+		var rec Record
+		err := decoder.Decode(&rec)
+		if err != nil {
+			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
+			return
+		}
+		if rec.Model != model {
+			err := errors.New(fmt.Sprintf("reqested ML model %s is not equal to meta-data model name %s", model, rec.Model))
+			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
+			return
+		}
+		if !InList(rec.Type, MLTypes) {
+			err := errors.New(fmt.Sprintf("ML type %s is not in supported list %+v", rec.Type, MLTypes))
+			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
+			return
+		}
+		// update ML meta-data
+		spec := bson.M{"model": model}
+		meta := bson.M{"model": model, "type": rec.Type, "meta_data": rec.MetaData}
+		err = MongoUpdate(Config.DBName, Config.DBColl, spec, meta)
+		if err != nil {
+			httpError(w, r, DatabaseError, err, http.StatusInternalServerError)
+		}
+		return
+	}
+	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
 // GetHandler handles GET HTTP requests, this request will
@@ -90,6 +121,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		if Config.Verbose > 0 {
 			log.Printf("delete ML model %s", model)
 		}
+		// delete ML model in MetaData database
 		spec := bson.M{"name": model}
 		err := MongoRemove(Config.DBName, Config.DBColl, spec)
 		if err != nil {
@@ -103,7 +135,12 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 // ModelsHandler provides information about registered ML models
 func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 	spec := bson.M{}
-	records := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+	if err != nil {
+		msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+		httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+		return
+	}
 	data, err := json.Marshal(records)
 	if err != nil {
 		msg := fmt.Sprintf("unable to marshal data, error=%v", err)
