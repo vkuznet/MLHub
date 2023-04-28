@@ -58,8 +58,16 @@ func checkRecord(rec Record, model string) error {
 		err := errors.New(fmt.Sprintf("reqested ML model %s is not equal to meta-data model name %s", model, rec.Model))
 		return err
 	}
+	if rec.Type == "" {
+		err := errors.New(fmt.Sprintf("ML type is missing, please provide one of %+v", MLTypes))
+		return err
+	}
 	if !InList(rec.Type, MLTypes) {
-		err := errors.New(fmt.Sprintf("ML type %s is not in supported list %+v", rec.Type, MLTypes))
+		err := errors.New(fmt.Sprintf("ML type %s is not supported, please provide one of %+v", rec.Type, MLTypes))
+		return err
+	}
+	if rec.MetaData == nil {
+		err := errors.New(fmt.Sprintf("Missing meta_data"))
 		return err
 	}
 	return nil
@@ -70,12 +78,39 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, fmt.Sprintf("%s/images/favicon.ico", Config.StaticDir))
 }
 
-// GetHandler handles GET HTTP requests
-func GetHandler(w http.ResponseWriter, r *http.Request) {
+// PredictHandler handles GET HTTP requests
+func PredictHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: I need to manage how to redirect requests to backend
 	// ML server APIs, so far redirect to TFaaS
 	backendURL := "http://localhost:8083"
 	reverseProxy(backendURL, w, r)
+}
+
+// GetHandler handles GET HTTP requests
+func GetHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	if model, ok := vars["model"]; ok {
+		if Config.Verbose > 0 {
+			log.Printf("get ML model %s meta-data", model)
+		}
+		// get ML meta-data
+		spec := bson.M{"model": model}
+		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+		if err != nil {
+			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		data, err := json.Marshal(records)
+		if err != nil {
+			msg := fmt.Sprintf("unable to marshal data, error=%v", err)
+			httpError(w, r, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
+		return
+	}
+	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
 // PostHandler handles POST HTTP requests,
@@ -179,7 +214,6 @@ func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 		httpError(w, r, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Write(data)
 	return
 }
