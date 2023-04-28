@@ -53,6 +53,18 @@ func httpError(w http.ResponseWriter, r *http.Request, code int, err error, http
 	}
 }
 
+func checkRecord(rec Record, model string) error {
+	if rec.Model != model {
+		err := errors.New(fmt.Sprintf("reqested ML model %s is not equal to meta-data model name %s", model, rec.Model))
+		return err
+	}
+	if !InList(rec.Type, MLTypes) {
+		err := errors.New(fmt.Sprintf("ML type %s is not in supported list %+v", rec.Type, MLTypes))
+		return err
+	}
+	return nil
+}
+
 // FaviconHandler
 func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, fmt.Sprintf("%s/images/favicon.ico", Config.StaticDir))
@@ -69,15 +81,8 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 // PostHandler handles POST HTTP requests,
 // this request will create and upload ML models to backend server(s)
 func PostHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO:
-	// - create new entry in MetaData database
-	// - call backend API to create upload new ML tarball
-	RequestHandler(w, r)
-}
-
-// PutHandler handles PUT HTTP requests, this request will
-// update ML model in backend or MetaData database
-func PutHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: add code to create ML model on backend
+	// so far the code below only creates ML model info in MetaData database
 	vars := mux.Vars(r)
 	if model, ok := vars["model"]; ok {
 		if Config.Verbose > 0 {
@@ -91,13 +96,40 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
 			return
 		}
-		if rec.Model != model {
-			err := errors.New(fmt.Sprintf("reqested ML model %s is not equal to meta-data model name %s", model, rec.Model))
+		if err := checkRecord(rec, model); err != nil {
 			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
 			return
 		}
-		if !InList(rec.Type, MLTypes) {
-			err := errors.New(fmt.Sprintf("ML type %s is not in supported list %+v", rec.Type, MLTypes))
+		// update ML meta-data
+		records := []Record{rec}
+		err = MongoUpsert(Config.DBName, Config.DBColl, records)
+		if err != nil {
+			httpError(w, r, DatabaseError, err, http.StatusInternalServerError)
+		}
+		return
+	}
+	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+}
+
+// PutHandler handles PUT HTTP requests, this request will
+// update ML model in backend or MetaData database
+func PutHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: add code to update ML model on backend
+	// so far the code below only updates ML model in MetaData database
+	vars := mux.Vars(r)
+	if model, ok := vars["model"]; ok {
+		if Config.Verbose > 0 {
+			log.Printf("update ML model %s", model)
+		}
+		// parse input JSON body
+		decoder := json.NewDecoder(r.Body)
+		var rec Record
+		err := decoder.Decode(&rec)
+		if err != nil {
+			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
+			return
+		}
+		if err := checkRecord(rec, model); err != nil {
 			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
 			return
 		}
