@@ -30,12 +30,9 @@ var MLTypes = []string{"TensorFlow", "PyTorch", "ScikitLearn"}
 
 // MLBackend represents ML backend engine
 type MLBackend struct {
-	Name       string `json:"name"`        // ML backend name, e.g. TFaaS
-	Type       string `json:"type"`        // ML backebd type, e.g. TensorFlow
-	URI        string `json:"uri"`         // ML backend URI, e.g. http://localhost:port
-	PredictApi string `json:"predict_api"` // ML backend predict API
-	DeleteApi  string `json:"delete_api"`  // ML backend delete API
-	UploadApi  string `json:"upload_api"`  // ML backend upload API
+	Name string `json:"name"` // ML backend name, e.g. TFaaS
+	Type string `json:"type"` // ML backebd type, e.g. TensorFlow
+	URI  string `json:"uri"`  // ML backend URI, e.g. http://localhost:port
 }
 
 // Predict performs predict action on upstream ML backend
