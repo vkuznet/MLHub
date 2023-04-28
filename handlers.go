@@ -97,10 +97,32 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 
 // PredictHandler handles GET HTTP requests
 func PredictHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: I need to manage how to redirect requests to backend
-	// ML server APIs, so far redirect to TFaaS
-	backendURL := "http://localhost:8083"
-	reverseProxy(backendURL, w, r)
+	vars := mux.Vars(r)
+	if model, ok := vars["model"]; ok {
+		// get ML meta-data
+		spec := bson.M{"model": model}
+		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+		if err != nil {
+			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		// we should have only one record from MetaData
+		if len(records) != 1 {
+			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
+			httpError(w, r, MetaDataError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		rec := records[0]
+		if backend, ok := Config.MLBackends[rec.Type]; ok {
+			uri := fmt.Sprintf("%s/%s", backend.URI, backend.PredictApi)
+			if Config.Verbose > 0 {
+				log.Printf("request predictions from ML model %s at %s", model, uri)
+			}
+			reverseProxy(uri, w, r)
+		}
+	}
+	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
 // DownloadHandler handles download action of ML model from back-end server
