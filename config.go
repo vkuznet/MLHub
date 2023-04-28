@@ -35,5 +35,8 @@ func parseConfig(configFile string) error {
 	if Config.LimiterPeriod == "" {
 		Config.LimiterPeriod = "100-S"
 	}
+	if Config.MLBackends == nil {
+		Config.MLBackends = make(MLBackends)
+	}
 	return nil
 }
