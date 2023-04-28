@@ -12,35 +12,45 @@ client --> MLHub --| -> PyTorch
 ```
 Each ML backend server may have different set of APIs and MLHub provides
 an uniform way to query these services. So far we support the following APIs:
-- `/upload` to upload ML tarball, POST HTTP request with ML model payload, e.g.
+- `/model/<name>` end-point provides the following methods:
+  - `GET` HTTP request will retrieve ML meta-data for provide ML name, e.g.
 ```
+curl http://localhost:port/model/mnist
+```
+  - `POST` HTTP request will create new ML entry in MLHub for provided
+  ML meta-data JSON record and ML tarball
+```
+# post ML meta-data
+curl -X POST \
+     -H "content-type: application/json" \
+     -d '{"model": "mnist", "type": "TensorFlow", "meta": {}}' \
+     http://localhost:port/model/mnist
+
+# upload ML model
 curl -X POST -H "Content-Encoding: gzip" \
      -H "content-type: application/octet-stream" \
      --data-binary @./mnist.tar.gz \
-     http://localhost:port/upload
+     http://localhost:port/model/mnist/upload
 ```
-- `/models/<model_name>` to delete existing ML model, DELETE HTTP request
+  - `DELETE` HTTP request will delete ML entry in MLHub for provided ML name
 ```
 curl -X DELETE \
-     http://localhost:port/models/mnist
+     http://localhost:port/model/mnist
 ```
-- `/models/<model_name>` to list existing ML models, GET HTTP request
+- `/models` to list existing ML models, GET HTTP request
 ```
 # to get all ML models
 curl http://localhost:port/models
-
-# to get concrete ML model
-curl http://localhost:port/models/mnist
 ```
-- `/models/<model_name>` to get prediction from a given ML model.
+- `/model/<model_name>/predict` to get prediction from a given ML model.
 ```
 curl -X GET \
      -H "content-type: application/json" \
      -d '{"input": [input values]}' \
-     http://localhost:port/models/mnist
+     http://localhost:port/model/mnist/predict
 ```
 or
 ```
-curl http://localhost:8083/models/mnist \
+curl http://localhost:8083/model/mnist \
      -F 'image=@./img4.png'
 ```
