@@ -11,10 +11,11 @@ client --> MLHub --| -> PyTorch
              |--------> MetaData service
 ```
 Each ML backend server may have different set of APIs and MLHub provides
-an uniform way to query these services. So far we support the following APIs:
+an uniform way to query these services. So far we support the following set of APIs:
 - `/model/<name>` end-point provides the following methods:
   - `GET` HTTP request will retrieve ML meta-data for provide ML name, e.g.
 ```
+# fetch meta-data info about ML model
 curl http://localhost:port/model/mnist
 ```
   - `POST` HTTP request will create new ML entry in MLHub for provided
@@ -25,12 +26,15 @@ curl -X POST \
      -H "content-type: application/json" \
      -d '{"model": "mnist", "type": "TensorFlow", "meta": {}}' \
      http://localhost:port/model/mnist
-
-# upload ML model
-curl -X POST -H "Content-Encoding: gzip" \
-     -H "content-type: application/octet-stream" \
-     --data-binary @./mnist.tar.gz \
-     http://localhost:port/model/mnist/upload
+```
+  - `PUT` HTTP request will update exsiting ML entry in MLHub for provided
+  ML meta-data JSON record
+```
+# post ML meta-data
+curl -X PUTT \
+     -H "content-type: application/json" \
+     -d '{"model": "mnist", "type": "TensorFlow", "meta": {"param": 1}}' \
+     http://localhost:port/model/mnist
 ```
   - `DELETE` HTTP request will delete ML entry in MLHub for provided ML name
 ```
@@ -42,6 +46,8 @@ curl -X DELETE \
 # to get all ML models
 curl http://localhost:port/models
 ```
+
+### ML model APIs
 - `/model/<model_name>/predict` to get prediction from a given ML model.
 ```
 curl -X GET \
@@ -53,4 +59,16 @@ or
 ```
 curl http://localhost:8083/model/mnist \
      -F 'image=@./img4.png'
+```
+- `/model/<model_name>/download` downloads ML model bundle
+```
+curl http://localhost:port/model/mnist/download
+```
+- `/model/<model_name>/upload` uploads ML model bundle
+```
+# upload ML model
+curl -X POST -H "Content-Encoding: gzip" \
+     -H "content-type: application/octet-stream" \
+     --data-binary @./mnist.tar.gz \
+     http://localhost:port/model/mnist/upload
 ```
