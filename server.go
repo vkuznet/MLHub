@@ -34,7 +34,8 @@ func handlers() *mux.Router {
 	router := mux.NewRouter()
 
 	// visible routes
-	router.HandleFunc(basePath("/model{model:[a-zA-Z0-9_]+}"), ModelsHandler)
+	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}"), RequestHandler)
+	router.HandleFunc(basePath("/models"), ModelsHandler).Methods("GET")
 	router.HandleFunc(basePath("/status"), StatusHandler).Methods("GET")
 	router.HandleFunc(basePath("/favicon.ico"), FaviconHandler).Methods("GET")
 	router.HandleFunc(basePath("/"), RequestHandler).Methods("GET")
