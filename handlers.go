@@ -103,11 +103,43 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 	reverseProxy(backendURL, w, r)
 }
 
+// DownloadHandler handles download action of ML model from back-end server
+func DownloadHandler(w http.ResponseWriter, r *http.Request) {
+	// look-up given ML name in MetaData database
+	vars := mux.Vars(r)
+	if model, ok := vars["model"]; ok {
+		if Config.Verbose > 0 {
+			log.Printf("get ML model %s meta-data", model)
+		}
+		// get ML meta-data
+		spec := bson.M{"model": model}
+		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+		if err != nil {
+			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		// we should have only one record from MetaData
+		if len(records) != 1 {
+			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
+			httpError(w, r, MetaDataError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		rec := records[0]
+		if backend, ok := Config.MLBackends[rec.Type]; ok {
+			bundle, err := backend.Download(rec.Model)
+			if err != nil {
+				httpError(w, r, BadRequest, errors.New("unable to download data from backend"), http.StatusInternalServerError)
+				return
+			}
+			w.Write(bundle)
+		}
+	}
+	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+}
+
 // UploadHandler handles upload action of ML model to back-end server
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: I need to manage how to redirect requests to backend
-	// ML server APIs in order to upload ML model
-
 	// look-up given ML name in MetaData database
 	vars := mux.Vars(r)
 	if model, ok := vars["model"]; ok {

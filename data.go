@@ -41,6 +41,11 @@ func (m *MLBackend) Upload(data []byte) error {
 	return nil
 }
 
+// Download downloads ML model from backend server
+func (m *MLBackend) Download(model string) ([]byte, error) {
+	return []byte{}, nil
+}
+
 // Delete performs delete action of the ML model on ML backend
 func (m *MLBackend) Delete(model string) error {
 	return nil
