@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -86,6 +87,9 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	if model, ok := vars["model"]; ok {
+		if Config.Verbose > 0 {
+			log.Printf("delete ML model %s", model)
+		}
 		spec := bson.M{"name": model}
 		err := MongoRemove(Config.DBName, Config.DBColl, spec)
 		if err != nil {
