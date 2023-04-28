@@ -6,11 +6,14 @@ package main
 //
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -73,6 +76,20 @@ func checkRecord(rec Record, model string) error {
 	return nil
 }
 
+// helper function to check if HTTP request contains form-data
+func formData(r *http.Request) bool {
+	for key, values := range r.Header {
+		if strings.ToLower(key) == "content-type" {
+			for _, v := range values {
+				if strings.Contains(strings.ToLower(v), "form-data") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // FaviconHandler
 func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, fmt.Sprintf("%s/images/favicon.ico", Config.StaticDir))
@@ -84,6 +101,66 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 	// ML server APIs, so far redirect to TFaaS
 	backendURL := "http://localhost:8083"
 	reverseProxy(backendURL, w, r)
+}
+
+// UploadHandler handles upload action of ML model to back-end server
+func UploadHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: I need to manage how to redirect requests to backend
+	// ML server APIs in order to upload ML model
+
+	// look-up given ML name in MetaData database
+	vars := mux.Vars(r)
+	if model, ok := vars["model"]; ok {
+		if Config.Verbose > 0 {
+			log.Printf("get ML model %s meta-data", model)
+		}
+		// get ML meta-data
+		spec := bson.M{"model": model}
+		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+		if err != nil {
+			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		// we should have only one record from MetaData
+		if len(records) != 1 {
+			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
+			httpError(w, r, MetaDataError, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		rec := records[0]
+		// check if we provided with proper form data
+		if !formData(r) {
+			httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
+			return
+		}
+		// read incoming data blog
+		var data []byte
+		defer r.Body.Close()
+		if r.Header.Get("Content-Encoding") == "gzip" {
+			r.Header.Del("Content-Length")
+			reader, err := gzip.NewReader(r.Body)
+			if err != nil {
+				httpError(w, r, BadRequest, errors.New("unable to get gzip reader"), http.StatusInternalServerError)
+				return
+			}
+			data, err = ioutil.ReadAll(GzipReader{reader, r.Body})
+		} else {
+			data, err = ioutil.ReadAll(r.Body)
+		}
+		if err != nil {
+			httpError(w, r, BadRequest, errors.New("unable to read body"), http.StatusBadRequest)
+			return
+		}
+
+		if backend, ok := Config.MLBackends[rec.Type]; ok {
+			if err := backend.Upload(data); err != nil {
+				httpError(w, r, BadRequest, errors.New("unable to upload data to backend"), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
 // GetHandler handles GET HTTP requests
