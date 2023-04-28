@@ -17,9 +17,9 @@ import (
 
 // Record define ML mongo record
 type Record struct {
-	Meta map[string]interface{} `json:"meta"` // meta-data information about ML model
-	Name string                 `json:"name"` // model name
-	Type string                 `json:"type"` // model type
+	MetaData map[string]interface{} `json:"meta_data"` // meta-data information about ML model
+	Model    string                 `json:"model"`     // model name
+	Type     string                 `json:"type"`      // model type
 }
 
 // ToJSON provides string representation of Record
@@ -52,19 +52,21 @@ func (m *MongoConnection) Connect() (*mgo.Session, error) {
 var _Mongo MongoConnection
 
 // MongoInsert records into MongoDB
-func MongoInsert(dbname, collname string, records []Record) {
+func MongoInsert(dbname, collname string, records []Record) error {
 	s, err := _Mongo.Connect()
 	if err != nil {
 		log.Println("Unable to connect to MongoDB", err)
-		return
+		return err
 	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
 	for _, rec := range records {
 		if err := c.Insert(&rec); err != nil {
 			log.Printf("Fail to insert record %v, error %v\n", rec, err)
+			return err
 		}
 	}
+	return nil
 }
 
 // MongoUpsert records into MongoDB
@@ -77,7 +79,7 @@ func MongoUpsert(dbname, collname string, records []Record) error {
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
 	for _, rec := range records {
-		model := rec.Name
+		model := rec.Model
 		if model == "" {
 			log.Printf("no model, record %v\n", rec)
 			continue
@@ -92,12 +94,12 @@ func MongoUpsert(dbname, collname string, records []Record) error {
 }
 
 // MongoGet records from MongoDB
-func MongoGet(dbname, collname string, spec bson.M, idx, limit int) []Record {
+func MongoGet(dbname, collname string, spec bson.M, idx, limit int) ([]Record, error) {
 	out := []Record{}
 	s, err := _Mongo.Connect()
 	if err != nil {
 		log.Println("Unable to connect to MongoDB", err)
-		return out
+		return out, err
 	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
@@ -109,16 +111,16 @@ func MongoGet(dbname, collname string, spec bson.M, idx, limit int) []Record {
 	if err != nil {
 		log.Printf("Unable to get records, error %v\n", err)
 	}
-	return out
+	return out, err
 }
 
 // MongoGetSorted records from MongoDB sorted by given key
-func MongoGetSorted(dbname, collname string, spec bson.M, skeys []string) []Record {
+func MongoGetSorted(dbname, collname string, spec bson.M, skeys []string) ([]Record, error) {
 	out := []Record{}
 	s, err := _Mongo.Connect()
 	if err != nil {
 		log.Println("Unable to connect to MongoDB", err)
-		return out
+		return out, err
 	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
@@ -131,7 +133,7 @@ func MongoGetSorted(dbname, collname string, spec bson.M, skeys []string) []Reco
 			log.Printf("Unable to find records, error %v\n", err)
 		}
 	}
-	return out
+	return out, err
 }
 
 // helper function to present in bson selected fields
@@ -144,11 +146,11 @@ func sel(q ...string) (r bson.M) {
 }
 
 // MongoUpdate inplace for given spec
-func MongoUpdate(dbname, collname string, spec, newdata bson.M) {
+func MongoUpdate(dbname, collname string, spec, newdata bson.M) error {
 	s, err := _Mongo.Connect()
 	if err != nil {
 		log.Println("Unable to connect to MongoDB", err)
-		return
+		return err
 	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
@@ -156,6 +158,7 @@ func MongoUpdate(dbname, collname string, spec, newdata bson.M) {
 	if err != nil {
 		log.Printf("Unable to update record, spec %v, data %v, error %v\n", spec, newdata, err)
 	}
+	return err
 }
 
 // MongoCount gets number records from MongoDB
