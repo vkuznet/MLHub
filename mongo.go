@@ -175,11 +175,11 @@ func MongoCount(dbname, collname string, spec bson.M) int {
 }
 
 // MongoRemove records from MongoDB
-func MongoRemove(dbname, collname string, spec bson.M) {
+func MongoRemove(dbname, collname string, spec bson.M) error {
 	s, err := _Mongo.Connect()
 	if err != nil {
 		log.Println("Unable to connect to MongoDB", err)
-		return
+		return err
 	}
 	defer s.Close()
 	c := s.DB(dbname).C(collname)
@@ -187,4 +187,5 @@ func MongoRemove(dbname, collname string, spec bson.M) {
 	if err != nil && err != mgo.ErrNotFound {
 		log.Printf("Unable to remove records, spec %v, error %v\n", spec, err)
 	}
+	return err
 }
