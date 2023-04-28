@@ -22,7 +22,7 @@ type Configuration struct {
 	DBURI               string     `json:"db_uri"`                 // meta-data server URI
 	DBName              string     `json:"db_name"`                // meta-data database name
 	DBColl              string     `json:"db_coll"`                // meta-data database collection name
-	MLBackends          MLBackends `json:"ml_backends"`            // ML backends
+	MLBackends          MLBackends `json:"backends"`               // ML backends
 }
 
 // MLTypes defines supported ML data types
