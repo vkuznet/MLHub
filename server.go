@@ -35,6 +35,7 @@ func handlers() *mux.Router {
 
 	// visible routes
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict"), PredictHandler)
+	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/upload"), UploadHandler)
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}"), RequestHandler)
 	router.HandleFunc(basePath("/models"), ModelsHandler).Methods("GET")
 	router.HandleFunc(basePath("/status"), StatusHandler).Methods("GET")
