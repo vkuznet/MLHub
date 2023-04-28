@@ -23,3 +23,6 @@ type Configuration struct {
 	DBName              string   `json:"db_name"`                // meta-data database name
 	DBColl              string   `json:"db_coll"`                // meta-data database collection name
 }
+
+// MLTypes defines supported ML data types
+var MLTypes = []string{"TensorFlow", "PyTorch", "ScikitLearn"}
