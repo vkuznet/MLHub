@@ -48,6 +48,18 @@ curl http://localhost:port/models
 ```
 
 ### ML model APIs
+- `/model/<model_name>/upload` uploads ML model bundle
+```
+# upload ML model
+curl -X POST -H "Content-Encoding: gzip" \
+     -H "content-type: application/octet-stream" \
+     --data-binary @./mnist.tar.gz \
+     http://localhost:port/model/mnist/upload
+```
+- `/model/<model_name>/download` downloads ML model bundle
+```
+curl http://localhost:port/model/mnist/download
+```
 - `/model/<model_name>/predict` to get prediction from a given ML model.
 ```
 curl -X GET \
@@ -59,16 +71,4 @@ or
 ```
 curl http://localhost:8083/model/mnist \
      -F 'image=@./img4.png'
-```
-- `/model/<model_name>/download` downloads ML model bundle
-```
-curl http://localhost:port/model/mnist/download
-```
-- `/model/<model_name>/upload` uploads ML model bundle
-```
-# upload ML model
-curl -X POST -H "Content-Encoding: gzip" \
-     -H "content-type: application/octet-stream" \
-     --data-binary @./mnist.tar.gz \
-     http://localhost:port/model/mnist/upload
 ```
