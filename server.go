@@ -34,11 +34,7 @@ func handlers() *mux.Router {
 	router := mux.NewRouter()
 
 	// visible routes
-	router.HandleFunc(basePath("/delete"), DeleteHandler).Methods("DELETE")
-	router.HandleFunc(basePath("/delete/{model:[a-zA-Z0-9_]+}"), DeleteHandler).Methods("DELETE")
-	router.HandleFunc(basePath("/upload"), UploadHandler).Methods("POST")
-	router.HandleFunc(basePath("/predict"), PredictHandler).Methods("POST")
-	router.HandleFunc(basePath("/models"), ModelsHandler).Methods("GET")
+	router.HandleFunc(basePath("/model{model:[a-zA-Z0-9_]+}"), ModelsHandler)
 	router.HandleFunc(basePath("/status"), StatusHandler).Methods("GET")
 	router.HandleFunc(basePath("/favicon.ico"), FaviconHandler).Methods("GET")
 	router.HandleFunc(basePath("/"), RequestHandler).Methods("GET")
@@ -137,8 +133,6 @@ func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
 // ProxyServer implements MLaaS reverse proxy server
 func MLaaSProxyServer() {
 	initLimiter(Config.LimiterPeriod)
-	// the request handler
-	//     http.HandleFunc("/", RequestHandler)
 	http.Handle(basePath("/"), handlers())
 
 	// start HTTPs server
