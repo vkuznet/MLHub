@@ -34,7 +34,8 @@ func handlers() *mux.Router {
 	router := mux.NewRouter()
 
 	// visible routes
-	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict"), PredictHandler)
+	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict/image"), PredictHandler).Methods("GET", "POST")
+	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict"), PredictHandler).Methods("GET", "POST")
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/upload"), UploadHandler)
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/download"), DownloadHandler)
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}"), RequestHandler)
