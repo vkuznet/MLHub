@@ -10,6 +10,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"io"
+	"compress/gzip"
 	"log"
 	"net/http"
 	"os"
@@ -111,4 +113,15 @@ func InList[T ListEntry](a T, list []T) bool {
                 return true
         }
         return false
+}
+
+// GzipReader struct to handle GZip'ed content of HTTP requests
+type GzipReader struct {
+        *gzip.Reader
+        io.Closer
+}
+
+// Close helper function to close gzip reader
+func (gz GzipReader) Close() error {
+        return gz.Closer.Close()
 }
