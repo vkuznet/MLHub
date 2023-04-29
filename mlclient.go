@@ -7,11 +7,16 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/mux"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // Predict function fetches prediction for given uri, model and client's
@@ -76,4 +81,42 @@ func Predict(uri, model string, r *http.Request) ([]byte, error) {
 	defer rsp.Body.Close()
 	data, err = io.ReadAll(rsp.Body)
 	return data, err
+}
+
+func Download(model string) ([]byte, error) {
+	// TODO: decide where we'll store ML models
+	// either on disk or in MetaData database
+	//     spec := bson.M{"model": model}
+	//     records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+	return []byte{}, nil
+}
+
+// helper function to get ML record for given HTTP request
+func modelRecord(r *http.Request) (string, Record, error) {
+	// look-up given ML name in MetaData database
+	vars := mux.Vars(r)
+	model, ok := vars["model"]
+	var rec Record
+	if ok {
+		if Config.Verbose > 0 {
+			log.Printf("get ML model %s meta-data", model)
+		}
+		// get ML meta-data
+		spec := bson.M{"model": model}
+		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+		if err != nil {
+			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+			return model, rec, errors.New(msg)
+		}
+		// we should have only one record from MetaData
+		if len(records) != 1 {
+			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
+			return model, rec, errors.New(msg)
+		}
+		rec = records[0]
+		return model, rec, nil
+	}
+	msg := fmt.Sprintf("unable to find %s model", model)
+	err := errors.New(msg)
+	return model, rec, err
 }
