@@ -97,83 +97,47 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 
 // PredictHandler handles GET HTTP requests
 func PredictHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
-		if Config.Verbose > 0 {
-			log.Printf("request predictions from ML model %s", model)
-		}
-		// get ML meta-data
-		spec := bson.M{"model": model}
-		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
-		if err != nil {
-			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
-			return
-		}
-		// we should have only one record from MetaData
-		if len(records) != 1 {
-			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
-			httpError(w, r, MetaDataError, errors.New(msg), http.StatusInternalServerError)
-			return
-		}
-		rec := records[0]
-		if Config.Verbose > 0 {
-			log.Printf("use ML MetaData record %+v", rec)
-		}
-		if backend, ok := Config.MLBackends[rec.Type]; ok {
-			path := r.RequestURI
-			bPath := strings.Replace(path, fmt.Sprintf("/model/%s", model), "", -1)
-			uri := fmt.Sprintf("%s", backend.URI)
-			rurl := uri + bPath
-			if Config.Verbose > 0 {
-				log.Printf("get predictions from %s model at %s", model, rurl)
-			}
-			data, err := Predict(rurl, model, r)
-			if err == nil {
-				w.Write(data)
-			} else {
-				httpError(w, r, BadRequest, err, http.StatusBadRequest)
-			}
-			//             reverseProxy(uri, w, r)
-		}
-		return
+	model, rec, err := modelRecord(r)
+	if err != nil {
+		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+	if backend, ok := Config.MLBackends[rec.Type]; ok {
+		path := r.RequestURI
+		bPath := strings.Replace(path, fmt.Sprintf("/model/%s", model), "", -1)
+		uri := fmt.Sprintf("%s", backend.URI)
+		rurl := uri + bPath
+		if Config.Verbose > 0 {
+			log.Printf("get predictions from %s model at %s", model, rurl)
+		}
+		data, err := Predict(rurl, model, r)
+		if err == nil {
+			w.Write(data)
+		} else {
+			httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		}
+	} else {
+		msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
+		httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
+	}
 }
 
 // DownloadHandler handles download action of ML model from back-end server
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
-	// look-up given ML name in MetaData database
-	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
-		if Config.Verbose > 0 {
-			log.Printf("get ML model %s meta-data", model)
-		}
-		// get ML meta-data
-		spec := bson.M{"model": model}
-		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
-		if err != nil {
-			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
-			return
-		}
-		// we should have only one record from MetaData
-		if len(records) != 1 {
-			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
-			httpError(w, r, MetaDataError, errors.New(msg), http.StatusInternalServerError)
-			return
-		}
-		rec := records[0]
-		if backend, ok := Config.MLBackends[rec.Type]; ok {
-			bundle, err := backend.Download(rec.Model)
-			if err != nil {
-				httpError(w, r, BadRequest, errors.New("unable to download data from backend"), http.StatusInternalServerError)
-				return
-			}
-			w.Write(bundle)
-		}
+	_, rec, err := modelRecord(r)
+	if err != nil {
+		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+	if _, ok := Config.MLBackends[rec.Type]; ok {
+		bundle, err := Download(rec.Model)
+		if err != nil {
+			httpError(w, r, BadRequest, errors.New("unable to download data from backend"), http.StatusInternalServerError)
+			return
+		}
+		w.Write(bundle)
+	} else {
+		msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
+		httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
+	}
 }
 
 // UploadHandler handles upload action of ML model to back-end server
@@ -260,9 +224,8 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
-// PostHandler handles POST HTTP requests,
-// this request will create and upload ML models to backend server(s)
-func PostHandler(w http.ResponseWriter, r *http.Request) {
+// helper function either to create/upsert or update record
+func addRecord(r *http.Request, update bool) error {
 	// TODO: add code to create ML model on backend
 	// so far the code below only creates ML model info in MetaData database
 	vars := mux.Vars(r)
@@ -275,56 +238,43 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 		var rec Record
 		err := decoder.Decode(&rec)
 		if err != nil {
-			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
-			return
+			return err
 		}
 		if err := checkRecord(rec, model); err != nil {
-			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
-			return
+			return err
 		}
-		// update ML meta-data
-		records := []Record{rec}
-		err = MongoUpsert(Config.DBName, Config.DBColl, records)
-		if err != nil {
-			httpError(w, r, DatabaseError, err, http.StatusInternalServerError)
+		if update {
+			// update ML meta-data
+			spec := bson.M{"model": model}
+			meta := bson.M{"model": model, "type": rec.Type, "meta_data": rec.MetaData}
+			err = MongoUpdate(Config.DBName, Config.DBColl, spec, meta)
+		} else {
+			// insert ML meta-data
+			records := []Record{rec}
+			err = MongoUpsert(Config.DBName, Config.DBColl, records)
 		}
-		return
+		return err
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+	msg := fmt.Sprintf("unable to get model HTTP parameter")
+	return errors.New(msg)
+}
+
+// PostHandler handles POST HTTP requests,
+// this request will create and upload ML models to backend server(s)
+func PostHandler(w http.ResponseWriter, r *http.Request) {
+	err := addRecord(r, false)
+	if err != nil {
+		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+	}
 }
 
 // PutHandler handles PUT HTTP requests, this request will
 // update ML model in backend or MetaData database
 func PutHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: add code to update ML model on backend
-	// so far the code below only updates ML model in MetaData database
-	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
-		if Config.Verbose > 0 {
-			log.Printf("update ML model %s", model)
-		}
-		// parse input JSON body
-		decoder := json.NewDecoder(r.Body)
-		var rec Record
-		err := decoder.Decode(&rec)
-		if err != nil {
-			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
-			return
-		}
-		if err := checkRecord(rec, model); err != nil {
-			httpError(w, r, MetaDataRecordError, err, http.StatusBadRequest)
-			return
-		}
-		// update ML meta-data
-		spec := bson.M{"model": model}
-		meta := bson.M{"model": model, "type": rec.Type, "meta_data": rec.MetaData}
-		err = MongoUpdate(Config.DBName, Config.DBColl, spec, meta)
-		if err != nil {
-			httpError(w, r, DatabaseError, err, http.StatusInternalServerError)
-		}
-		return
+	err := addRecord(r, true)
+	if err != nil {
+		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
 // GetHandler handles GET HTTP requests, this request will
