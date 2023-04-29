@@ -6,14 +6,12 @@ package main
 //
 
 import (
-	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -120,103 +118,27 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		rec := records[0]
 		if Config.Verbose > 0 {
-			log.Printf("Found ML MetaData record %+v", rec)
+			log.Printf("use ML MetaData record %+v", rec)
 		}
-		log.Printf("ML backends %+v", Config.MLBackends)
 		if backend, ok := Config.MLBackends[rec.Type]; ok {
 			path := r.RequestURI
 			bPath := strings.Replace(path, fmt.Sprintf("/model/%s", model), "", -1)
 			uri := fmt.Sprintf("%s", backend.URI)
+			rurl := uri + bPath
 			if Config.Verbose > 0 {
-				log.Printf("request predictions from ML model %s at %s get %s", model, uri, bPath)
+				log.Printf("get predictions from %s model at %s", model, rurl)
 			}
-			r.RequestURI = bPath
-			r.URL.Path = bPath
-			// TODO: I need to adjust r.Body to add model=mnist form value
-			//             if backend.Type == "TensorFlow" {
-			//                 updateRequestForm(r, "model", model)
-			//             }
-			reverseProxy(uri, w, r)
+			data, err := Predict(rurl, model, r)
+			if err == nil {
+				w.Write(data)
+			} else {
+				httpError(w, r, BadRequest, err, http.StatusBadRequest)
+			}
+			//             reverseProxy(uri, w, r)
 		}
 		return
 	}
 	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
-}
-
-func updateRequestForm(r *http.Request, key, value string) {
-	ctype := r.Header.Get("Content-Type")
-	data, err := io.ReadAll(r.Body)
-	if err == nil {
-		log.Printf("### data\n%s\nsize=%d", string(data), len(data))
-	}
-	r.Body.Close()
-	boundary := strings.Split(string(data), "\n")[0]
-	body := fmt.Sprintf("%s\nContent-Disposition: form-data; name=\"%s\"\n\n%s\n", boundary, key, value)
-	body += boundary
-	body += string(data)
-	r.Body = io.NopCloser(strings.NewReader(body))
-	r.Header.Set("Content-Length", fmt.Sprintf("%d", len([]byte(body))))
-	r.Header.Set("Content-Type", ctype)
-	r.ContentLength = int64(len([]byte(body)))
-	log.Printf("+++ data\n%s\nsize=%d", body, len([]byte(body)))
-
-	/*
-		err := r.ParseMultipartForm(32 << 20) // maxMemory
-		log.Printf("### data %+v, error %v", r.MultipartForm, err, r.Header.Get("Content-Length"))
-		// ### data &{Value:map[] File:map[image:[0xc000180240]]}, error <nil>%!(EXTRA string=831)
-		r.MultipartForm.Value[key] = []string{value}
-		log.Printf("### data %+v, error %v", r.MultipartForm, err, r.Header.Get("Content-Length"))
-
-		// write multipart form to body
-		var buf bytes.Buffer
-
-		// create new multipart writer
-		w := multipart.NewWriter(&buf)
-		defer w.Close()
-
-		// create new field
-		for k, v := range r.MultipartForm.Value {
-			w.WriteField(k, v)
-		}
-		for k, v := range r.MultipartForm.File {
-		}
-
-		// update conten type
-		r.Header.Set("Content-Type", w.FormDataContentType())
-		r.Body = io.NopCloser(strings.NewReader(string(buf.Bytes())))
-		r.Header.Set("Content-Length", fmt.Sprintf("%d", buf.Len()))
-	*/
-}
-func updateRequestForm2(r *http.Request, key, value string) {
-
-	var buf bytes.Buffer
-	var err error
-	var data []byte
-
-	// read existing body content
-	//     defer r.Body.Close()
-	//     data, err = io.ReadAll(r.Body)
-	//     if err == nil {
-	//         b := bytes.NewBuffer(data)
-	//         buf = *b
-	//     }
-	//     log.Println("### data", string(data), buf.Len())
-
-	// create new multipart writer
-	w := multipart.NewWriter(&buf)
-	defer w.Close()
-
-	// create new field
-	w.WriteField(key, value)
-
-	// update conten type
-	r.Header.Set("Content-Type", w.FormDataContentType())
-	r.Body = io.NopCloser(strings.NewReader(string(buf.Bytes())))
-	r.Header.Set("Content-Length", fmt.Sprintf("%d", buf.Len()))
-	data, err = io.ReadAll(r.Body)
-	if err == nil {
-		log.Println("### new data", string(data))
-	}
 }
 
 // DownloadHandler handles download action of ML model from back-end server
