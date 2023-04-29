@@ -6,11 +6,9 @@ package main
 //
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -56,6 +54,7 @@ func httpError(w http.ResponseWriter, r *http.Request, code int, err error, http
 	}
 }
 
+// helper function to check record attributes
 func checkRecord(rec Record, model string) error {
 	if rec.Model != model {
 		err := errors.New(fmt.Sprintf("reqested ML model %s is not equal to meta-data model name %s", model, rec.Model))
@@ -142,59 +141,20 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 // UploadHandler handles upload action of ML model to back-end server
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	// look-up given ML name in MetaData database
-	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
-		if Config.Verbose > 0 {
-			log.Printf("get ML model %s meta-data", model)
-		}
-		// get ML meta-data
-		spec := bson.M{"model": model}
-		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
-		if err != nil {
-			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
-			return
-		}
-		// we should have only one record from MetaData
-		if len(records) != 1 {
-			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
-			httpError(w, r, MetaDataError, errors.New(msg), http.StatusInternalServerError)
-			return
-		}
-		rec := records[0]
-		// check if we provided with proper form data
-		if !formData(r) {
-			httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
-			return
-		}
-		// read incoming data blog
-		var data []byte
-		defer r.Body.Close()
-		if r.Header.Get("Content-Encoding") == "gzip" {
-			r.Header.Del("Content-Length")
-			reader, err := gzip.NewReader(r.Body)
-			if err != nil {
-				httpError(w, r, BadRequest, errors.New("unable to get gzip reader"), http.StatusInternalServerError)
-				return
-			}
-			data, err = io.ReadAll(GzipReader{reader, r.Body})
-		} else {
-			data, err = io.ReadAll(r.Body)
-		}
-		if err != nil {
-			httpError(w, r, BadRequest, errors.New("unable to read body"), http.StatusBadRequest)
-			return
-		}
-
-		if backend, ok := Config.MLBackends[rec.Type]; ok {
-			if err := backend.Upload(data); err != nil {
-				httpError(w, r, BadRequest, errors.New("unable to upload data to backend"), http.StatusInternalServerError)
-				return
-			}
-		}
+	model, rec, err := modelRecord(r)
+	if err != nil {
+		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		return
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+	// check if we provided with proper form data
+	if !formData(r) {
+		httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
+		return
+	}
+	err = Upload(model, rec, r)
+	if err != nil {
+		httpError(w, r, BadRequest, err, http.StatusInternalServerError)
+	}
 }
 
 // GetHandler handles GET HTTP requests

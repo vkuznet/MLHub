@@ -7,6 +7,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -89,6 +90,34 @@ func Download(model string) ([]byte, error) {
 	//     spec := bson.M{"model": model}
 	//     records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 	return []byte{}, nil
+}
+
+// Upload function uploads data for given model to MeataData database
+func Upload(model string, rec Record, r *http.Request) error {
+	// read incoming data blog
+	var data []byte
+	var err error
+	defer r.Body.Close()
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		r.Header.Del("Content-Length")
+		reader, err := gzip.NewReader(r.Body)
+		if err != nil {
+			return err
+		}
+		data, err = io.ReadAll(GzipReader{reader, r.Body})
+	} else {
+		data, err = io.ReadAll(r.Body)
+	}
+	if err != nil {
+		return err
+	}
+
+	if _, ok := Config.MLBackends[rec.Type]; ok {
+		// TODO: implement upload budle to MetaData database, and to specific ML backend
+		// each backend may have different upload APIs
+		log.Println("TODO: upload", string(data))
+	}
+	return nil
 }
 
 // helper function to get ML record for given HTTP request
