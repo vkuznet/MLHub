@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/uptrace/bunrouter"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -125,6 +126,13 @@ func modelRecord(r *http.Request) (string, Record, error) {
 	// look-up given ML name in MetaData database
 	vars := mux.Vars(r)
 	model, ok := vars["model"]
+
+	if !ok { // no gorilla/mux
+		params := bunrouter.ParamsFromContext(r.Context())
+		fmt.Println("### bunrouter params", params.Route(), params.Map())
+		model, ok = params.Map()["model"]
+	}
+
 	var rec Record
 	if ok {
 		if Config.Verbose > 0 {

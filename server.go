@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/uptrace/bunrouter"
+	"github.com/uptrace/bunrouter/extra/reqlog"
 )
 
 // helper function to get base path
@@ -135,10 +137,25 @@ func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// ProxyServer implements MLaaS reverse proxy server
-func MLaaSProxyServer() {
+// Server implements MLaaS server
+func Server() {
 	initLimiter(Config.LimiterPeriod)
-	http.Handle(basePath("/"), handlers())
+	//     http.Handle(basePath("/"), handlers())
+	router := bunrouter.New(
+		bunrouter.Use(reqlog.NewMiddleware()),
+		//         bunrouter.Use(limitMiddleware),
+	).Compat()
+	router.GET("/", RequestHandler)
+	router.GET("/favicon.ico", FaviconHandler)
+	router.GET("/status", StatusHandler)
+	router.GET("/models", ModelsHandler)
+	router.GET("/model/:model/predict/image", PredictHandler)
+	router.POST("/model/:model/predict/image", PredictHandler)
+	router.GET("/model/:model/predict", PredictHandler)
+	router.POST("/model/:model/predict", PredictHandler)
+	router.POST("/model/:model/upload", UploadHandler)
+	router.GET("/model/:model/download", DownloadHandler)
+	router.GET("/model/:model", RequestHandler)
 
 	// start HTTPs server
 	if len(Config.DomainNames) > 0 {
@@ -152,11 +169,13 @@ func MLaaSProxyServer() {
 		server := &http.Server{
 			Addr:      ":https",
 			TLSConfig: tlsConfig,
+			Handler:   router,
 		}
 		log.Printf("Start HTTPs server with %s and %s on :%d", Config.ServerCrt, Config.ServerKey, Config.Port)
 		log.Fatal(server.ListenAndServeTLS(Config.ServerCrt, Config.ServerKey))
 	} else {
 		log.Printf("Start HTTP server on :%d", Config.Port)
-		http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), nil)
+		//         http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), nil)
+		http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), router)
 	}
 }

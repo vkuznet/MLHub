@@ -53,5 +53,5 @@ func main() {
 	}
 
 	// start proxy server
-	MLaaSProxyServer()
+	Server()
 }
