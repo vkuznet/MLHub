@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -37,6 +38,14 @@ func parseConfig(configFile string) error {
 	}
 	if Config.MLBackends == nil {
 		Config.MLBackends = make(MLBackends)
+	}
+	if Config.StaticDir == "" {
+		cdir, err := os.Getwd()
+		if err == nil {
+			Config.StaticDir = fmt.Sprintf("%s/static", cdir)
+		} else {
+			Config.StaticDir = "static"
+		}
 	}
 	return nil
 }
