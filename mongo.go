@@ -17,9 +17,12 @@ import (
 
 // Record define ML mongo record
 type Record struct {
-	MetaData map[string]interface{} `json:"meta_data"` // meta-data information about ML model
-	Model    string                 `json:"model"`     // model name
-	Type     string                 `json:"type"`      // model type
+	MetaData    map[string]interface{} `json:"meta_data"`   // meta-data information about ML model
+	Model       string                 `json:"model"`       // model name
+	Type        string                 `json:"type"`        // model type
+	Version     string                 `json:"version"`     // ML version
+	Description string                 `json:"description"` // ML model description
+	Reference   string                 `json:"reference"`   // ML reference URL
 }
 
 // ToJSON provides string representation of Record
