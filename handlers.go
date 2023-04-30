@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/uptrace/bunrouter"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -160,7 +161,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 // GetHandler handles GET HTTP requests
 func GetHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
+	model, ok := vars["model"]
+	if !ok { // no gorilla/mux, try bunrouter params map
+		params := bunrouter.ParamsFromContext(r.Context())
+		model, ok = params.Map()["model"]
+	}
+	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("get ML model %s meta-data", model)
 		}
@@ -189,7 +195,12 @@ func addRecord(r *http.Request, update bool) error {
 	// TODO: add code to create ML model on backend
 	// so far the code below only creates ML model info in MetaData database
 	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
+	model, ok := vars["model"]
+	if !ok { // no gorilla/mux, try bunrouter params map
+		params := bunrouter.ParamsFromContext(r.Context())
+		model, ok = params.Map()["model"]
+	}
+	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("update ML model %s", model)
 		}
@@ -241,7 +252,12 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 // delete ML model in backend and MetaData database
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	if model, ok := vars["model"]; ok {
+	model, ok := vars["model"]
+	if !ok { // no gorilla/mux, try bunrouter params map
+		params := bunrouter.ParamsFromContext(r.Context())
+		model, ok = params.Map()["model"]
+	}
+	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("delete ML model %s", model)
 		}

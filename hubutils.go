@@ -126,10 +126,8 @@ func modelRecord(r *http.Request) (string, Record, error) {
 	// look-up given ML name in MetaData database
 	vars := mux.Vars(r)
 	model, ok := vars["model"]
-
-	if !ok { // no gorilla/mux
+	if !ok { // no gorilla/mux, try bunrouter params map
 		params := bunrouter.ParamsFromContext(r.Context())
-		fmt.Println("### bunrouter params", params.Route(), params.Map())
 		model, ok = params.Map()["model"]
 	}
 
