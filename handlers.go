@@ -258,6 +258,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 // ModelsHandler provides information about registered ML models
 func ModelsHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: Add parameters for /models endpoint, eg q=query, limit, idx for pagination
 	spec := bson.M{}
 	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 	if err != nil {
