@@ -11,11 +11,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	limiter "github.com/ulule/limiter/v3"
 	stdlib "github.com/ulule/limiter/v3/drivers/middleware/stdlib"
 	memory "github.com/ulule/limiter/v3/drivers/store/memory"
+	"github.com/uptrace/bunrouter"
 )
 
 // limiter middleware pointer
@@ -39,7 +41,7 @@ func Validate(r *http.Request) error {
 	return nil
 }
 
-// helper to validate incoming requests' parameters
+// mux (http.Handler) validate middleware to validate incoming requests' parameters
 func validateMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
@@ -64,7 +66,7 @@ func validateMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// limit middleware limits incoming requests
+// mux (http.Handler) limitier middleware to limit incoming requests
 func limitMiddleware(next http.Handler) http.Handler {
 	return limiterMiddleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
@@ -101,7 +103,7 @@ func (rw *responseWriter) WriteHeader(code int) {
 	return
 }
 
-// loggingMiddleware logs the incoming HTTP request and its duration.
+// mux (http.Handler) logging middleware to log the incoming HTTP request and its duration.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -117,4 +119,60 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		var dataSize int64
 		logRequest(w, r, start, wrapped.status, tstamp, dataSize)
 	})
+}
+
+/*
+ * bunrouter middlewares based on bunrouter.HandlerFunc (http.HandlerFunc)
+ */
+
+// bunrouer logging middelware implementation
+func bunrouterLoggingMiddleware(next bunrouter.HandlerFunc) bunrouter.HandlerFunc {
+	return func(w http.ResponseWriter, r bunrouter.Request) error {
+		start := time.Now()
+		tstamp := int64(start.UnixNano() / 1000000) // use milliseconds for MONIT
+
+		wrapped := wrapResponseWriter(w)
+		status := wrapped.status
+		if status == 0 { // the status code was not set, i.e. everything is fine
+			status = 200
+		}
+		if err := next(wrapped, r); err != nil {
+			return err
+		}
+		var dataSize int64
+		logRequest(w, r.Request, start, wrapped.status, tstamp, dataSize)
+		return nil
+	}
+}
+
+// bunrouter limiter middleware implementation, based on
+// https://github.com/ulule/limiter/blob/master/drivers/middleware/stdlib/middleware.go#L36
+func bunrouterLimitMiddleware(next bunrouter.HandlerFunc) bunrouter.HandlerFunc {
+	return func(w http.ResponseWriter, req bunrouter.Request) error {
+		if Config.Verbose > 0 {
+			log.Println("limiter middleware check")
+		}
+		r := req.Request
+		key := limiterMiddleware.KeyGetter(r)
+		if limiterMiddleware.ExcludedKey != nil && limiterMiddleware.ExcludedKey(key) {
+			return next(w, req)
+		}
+
+		context, err := limiterMiddleware.Limiter.Get(r.Context(), key)
+		if err != nil {
+			limiterMiddleware.OnError(w, r, err)
+			return err
+		}
+
+		w.Header().Add("X-RateLimit-Limit", strconv.FormatInt(context.Limit, 10))
+		w.Header().Add("X-RateLimit-Remaining", strconv.FormatInt(context.Remaining, 10))
+		w.Header().Add("X-RateLimit-Reset", strconv.FormatInt(context.Reset, 10))
+
+		if context.Reached {
+			limiterMiddleware.OnLimitReached(w, r)
+			return nil
+		}
+		// execute next ServeHTTP middleware/step
+		return next(w, req)
+	}
 }

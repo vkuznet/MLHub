@@ -14,7 +14,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/uptrace/bunrouter"
-	"github.com/uptrace/bunrouter/extra/reqlog"
 )
 
 // helper function to get base path
@@ -31,7 +30,7 @@ func basePath(s string) string {
 	return s
 }
 
-// http handlers
+// http handlers based on gorilla/mux
 func handlers() *mux.Router {
 	router := mux.NewRouter()
 
@@ -51,6 +50,26 @@ func handlers() *mux.Router {
 	// use limiter middleware to slow down clients
 	router.Use(limitMiddleware)
 
+	return router
+}
+
+// bunrouter implementation of the compatible (with net/http) router handlers
+func bunRouter() *bunrouter.CompatRouter {
+	router := bunrouter.New(
+		bunrouter.Use(bunrouterLoggingMiddleware),
+		bunrouter.Use(bunrouterLimitMiddleware),
+	).Compat()
+	router.GET("/", RequestHandler)
+	router.GET("/favicon.ico", FaviconHandler)
+	router.GET("/status", StatusHandler)
+	router.GET("/models", ModelsHandler)
+	router.GET("/model/:model/predict/image", PredictHandler)
+	router.POST("/model/:model/predict/image", PredictHandler)
+	router.GET("/model/:model/predict", PredictHandler)
+	router.POST("/model/:model/predict", PredictHandler)
+	router.POST("/model/:model/upload", UploadHandler)
+	router.GET("/model/:model/download", DownloadHandler)
+	router.GET("/model/:model", RequestHandler)
 	return router
 }
 
@@ -140,22 +159,26 @@ func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
 // Server implements MLaaS server
 func Server() {
 	initLimiter(Config.LimiterPeriod)
+	// gorilla/mux handlers
 	//     http.Handle(basePath("/"), handlers())
-	router := bunrouter.New(
-		bunrouter.Use(reqlog.NewMiddleware()),
-		//         bunrouter.Use(limitMiddleware),
-	).Compat()
-	router.GET("/", RequestHandler)
-	router.GET("/favicon.ico", FaviconHandler)
-	router.GET("/status", StatusHandler)
-	router.GET("/models", ModelsHandler)
-	router.GET("/model/:model/predict/image", PredictHandler)
-	router.POST("/model/:model/predict/image", PredictHandler)
-	router.GET("/model/:model/predict", PredictHandler)
-	router.POST("/model/:model/predict", PredictHandler)
-	router.POST("/model/:model/upload", UploadHandler)
-	router.GET("/model/:model/download", DownloadHandler)
-	router.GET("/model/:model", RequestHandler)
+
+	// bunrouter implementation of the router
+	router := bunRouter()
+	//     router := bunrouter.New(
+	//         bunrouter.Use(bunrouterLoggingMiddleware),
+	//         bunrouter.Use(bunrouterLimitMiddleware),
+	//     ).Compat()
+	//     router.GET("/", RequestHandler)
+	//     router.GET("/favicon.ico", FaviconHandler)
+	//     router.GET("/status", StatusHandler)
+	//     router.GET("/models", ModelsHandler)
+	//     router.GET("/model/:model/predict/image", PredictHandler)
+	//     router.POST("/model/:model/predict/image", PredictHandler)
+	//     router.GET("/model/:model/predict", PredictHandler)
+	//     router.POST("/model/:model/predict", PredictHandler)
+	//     router.POST("/model/:model/upload", UploadHandler)
+	//     router.GET("/model/:model/download", DownloadHandler)
+	//     router.GET("/model/:model", RequestHandler)
 
 	// start HTTPs server
 	if len(Config.DomainNames) > 0 {
@@ -169,13 +192,16 @@ func Server() {
 		server := &http.Server{
 			Addr:      ":https",
 			TLSConfig: tlsConfig,
-			Handler:   router,
+			Handler:   router, // it is not used in gorilla/mux
 		}
 		log.Printf("Start HTTPs server with %s and %s on :%d", Config.ServerCrt, Config.ServerKey, Config.Port)
 		log.Fatal(server.ListenAndServeTLS(Config.ServerCrt, Config.ServerKey))
 	} else {
 		log.Printf("Start HTTP server on :%d", Config.Port)
+		// for gorilla/mux we do not pass router but rather use http module itself
 		//         http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), nil)
+
+		// for bunrouter we pass router handler
 		http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), router)
 	}
 }
