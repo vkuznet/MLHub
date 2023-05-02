@@ -164,21 +164,6 @@ func Server() {
 
 	// bunrouter implementation of the router
 	router := bunRouter()
-	//     router := bunrouter.New(
-	//         bunrouter.Use(bunrouterLoggingMiddleware),
-	//         bunrouter.Use(bunrouterLimitMiddleware),
-	//     ).Compat()
-	//     router.GET("/", RequestHandler)
-	//     router.GET("/favicon.ico", FaviconHandler)
-	//     router.GET("/status", StatusHandler)
-	//     router.GET("/models", ModelsHandler)
-	//     router.GET("/model/:model/predict/image", PredictHandler)
-	//     router.POST("/model/:model/predict/image", PredictHandler)
-	//     router.GET("/model/:model/predict", PredictHandler)
-	//     router.POST("/model/:model/predict", PredictHandler)
-	//     router.POST("/model/:model/upload", UploadHandler)
-	//     router.GET("/model/:model/download", DownloadHandler)
-	//     router.GET("/model/:model", RequestHandler)
 
 	// start HTTPs server
 	if len(Config.DomainNames) > 0 {
