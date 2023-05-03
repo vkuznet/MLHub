@@ -33,6 +33,28 @@ type HTTPError struct {
 	Reason         string `json:"reason"`           // error message
 }
 
+// helper function to get model name from http request
+func getModel(r *http.Request) (string, bool) {
+	vars := mux.Vars(r)
+	model, ok := vars["model"]
+	if !ok { // no gorilla/mux, try bunrouter params map
+		params := bunrouter.ParamsFromContext(r.Context())
+		model, ok = params.Map()["model"]
+	}
+	return model, ok
+}
+
+// helper function to parse given template and return HTML page
+func tmplPage(tmpl string, tmplData TmplRecord) string {
+	if tmplData == nil {
+		tmplData = make(TmplRecord)
+	}
+	var templates Templates
+	tdir := fmt.Sprintf("%s/templates", Config.StaticDir)
+	page := templates.Tmpl(tdir, tmpl, tmplData)
+	return page
+}
+
 // helper function to provide standard HTTP error reply
 func httpError(w http.ResponseWriter, r *http.Request, code int, err error, httpCode int) {
 	hrec := HTTPError{
@@ -160,12 +182,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetHandler handles GET HTTP requests
 func GetHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	model, ok := vars["model"]
-	if !ok { // no gorilla/mux, try bunrouter params map
-		params := bunrouter.ParamsFromContext(r.Context())
-		model, ok = params.Map()["model"]
-	}
+	model, ok := getModel(r)
 	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("get ML model %s meta-data", model)
@@ -187,19 +204,19 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(data)
 		return
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+	// if we are here we'll show HTTP content
+	tmpl := make(TmplRecord)
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+	page := tmplPage("index.tmpl", tmpl)
+	w.Write([]byte(page))
 }
 
 // helper function either to create/upsert or update record
 func addRecord(r *http.Request, update bool) error {
 	// TODO: add code to create ML model on backend
 	// so far the code below only creates ML model info in MetaData database
-	vars := mux.Vars(r)
-	model, ok := vars["model"]
-	if !ok { // no gorilla/mux, try bunrouter params map
-		params := bunrouter.ParamsFromContext(r.Context())
-		model, ok = params.Map()["model"]
-	}
+	model, ok := getModel(r)
 	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("update ML model %s", model)
@@ -251,12 +268,7 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 // GetHandler handles GET HTTP requests, this request will
 // delete ML model in backend and MetaData database
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	model, ok := vars["model"]
-	if !ok { // no gorilla/mux, try bunrouter params map
-		params := bunrouter.ParamsFromContext(r.Context())
-		model, ok = params.Map()["model"]
-	}
+	model, ok := getModel(r)
 	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("delete ML model %s", model)
