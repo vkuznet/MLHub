@@ -52,7 +52,7 @@ section:after {
 
 /* Style the footer */
 footer {
-  background-color: #777;
+  background-color: gray;
   padding: 10px;
   text-align: center;
   color: white;
@@ -79,4 +79,21 @@ footer {
     width: 100%;
     height: auto;
   }
+}
+
+/* input with button */
+input[type="text"] {
+    width: 200px;
+    height: 30px;
+    padding-right: 50px;
+}
+
+input[type="submit"] {
+    margin-left: -50px;
+    height: 30px;
+    width: 70px;
+    background: gray;
+    color: white;
+    border: 0;
+    -webkit-appearance: none;
 }
