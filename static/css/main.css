@@ -11,7 +11,7 @@ body {
 /* Style the header */
 header {
   background-color: #b31b1b;
-  padding: 30px;
+  padding: 20px;
   text-align: center;
   font-size: 35px;
   color: white;
@@ -25,6 +25,9 @@ nav {
   background: #ccc;
   padding: 20px;
 }
+
+ul, li {list-style-type: none;}
+li {padding-left: 2em; text-indent: -2em; font-size: 12px; text-align: left;}
 
 /* Style the list inside the menu */
 nav ul {
@@ -64,9 +67,10 @@ footer {
 .box {
   display: grid;
   text-align: center;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+/*  grid-template-columns: 1fr 1fr 1fr 1fr;*/
+  grid-template-columns: auto auto auto auto;
   grid-gap: 10px 2em;
-  padding-left: 100px;
+  padding-left: 150px;
 }
 
 .box :first-child {

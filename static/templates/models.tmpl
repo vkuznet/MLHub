@@ -16,9 +16,11 @@
   <article>
 {{range $rec := .Records}}
     <div class="record">
-        model: {{$rec.Model}}
+        Model: {{$rec.Model}}
         <br/>
-        type: {{$rec.Type}}
+        Type: {{$rec.Type}}
+        <hr/>
+        Description: {{$rec.Description}}
         <hr/>
     </div> <!-- div record -->
 {{end}}
