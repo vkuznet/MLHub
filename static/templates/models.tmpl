@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>CMS Monitoring</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="{{.Base}}/css/records.css" />
+</head>
+<body>
+
+<header>
+    <h2>ML Hub</h2>
+</header>
+
+<section>
+  <article>
+{{range $rec := .Records}}
+    <div class="record">
+        model: {{$rec.Model}}
+        <br/>
+        type: {{$rec.Type}}
+        <hr/>
+    </div> <!-- div record -->
+{{end}}
+  </article>
+</section>
+
+<footer>
+  <p>MLHub &#169; Cornell University</p>
+</footer>
+
+</body>
+</html>
+

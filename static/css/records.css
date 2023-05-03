@@ -1,0 +1,55 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0px;
+}
+
+/* Style the header */
+header {
+  background-color: #b31b1b;
+  padding: 20px;
+  text-align: center;
+  color: white;
+}
+
+article {
+  float: left;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  padding-left: 300px;
+  padding-right: 300px;
+  background-color: #f1f1f1;
+  width:100%;
+  height: 600px;
+}
+
+/* Clear floats after the columns */
+section:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+/* Style the footer */
+footer {
+  background-color: gray;
+  padding: 10px;
+  text-align: center;
+  color: white;
+}
+
+.record {
+    padding: 30px;
+}
+
+/* Responsive layout - makes the two columns/boxes stack on top of each other instead of next to each other, on small screens */
+@media (max-width: 600px) {
+  nav, article {
+    width: 100%;
+    height: auto;
+  }
+}
