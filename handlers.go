@@ -294,14 +294,23 @@ func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 		httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
 		return
 	}
-	data, err := json.Marshal(records)
-	if err != nil {
-		msg := fmt.Sprintf("unable to marshal data, error=%v", err)
-		httpError(w, r, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
+	log.Println("### request", r.Header.Get("Accept"), r)
+	if r.Header.Get("Accept") == "application/json" {
+		data, err := json.Marshal(records)
+		if err != nil {
+			msg := fmt.Sprintf("unable to marshal data, error=%v", err)
+			httpError(w, r, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
 		return
 	}
-	w.Write(data)
-	return
+	tmpl := make(TmplRecord)
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+	tmpl["Records"] = records
+	page := tmplPage("models.tmpl", tmpl)
+	w.Write([]byte(page))
 }
 
 // StatusHandler handles status of MLHub server
