@@ -45,6 +45,14 @@ func handlers() *mux.Router {
 	router.HandleFunc(basePath("/favicon.ico"), FaviconHandler).Methods("GET")
 	router.HandleFunc(basePath("/"), RequestHandler).Methods("GET")
 
+	// static handlers
+	for _, dir := range []string{"js", "css", "images"} {
+		m := fmt.Sprintf("%s/%s/", Config.Base, dir)
+		d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
+		hdlr := http.StripPrefix(m, http.FileServer(http.Dir(d)))
+		http.Handle(m, hdlr)
+	}
+
 	// log all requests
 	router.Use(loggingMiddleware)
 	// use limiter middleware to slow down clients
@@ -70,6 +78,15 @@ func bunRouter() *bunrouter.CompatRouter {
 	router.POST("/model/:model/upload", UploadHandler)
 	router.GET("/model/:model/download", DownloadHandler)
 	router.GET("/model/:model", RequestHandler)
+
+	// static handlers
+	for _, dir := range []string{"js", "css", "images"} {
+		m := fmt.Sprintf("%s/%s", Config.Base, dir)
+		d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
+		hdlr := http.StripPrefix(m, http.FileServer(http.Dir(d)))
+		// invoke bunrouter from Compat to setup static content
+		router.Router.GET(m+"/*path", bunrouter.HTTPHandler(hdlr))
+	}
 	return router
 }
 
@@ -158,6 +175,7 @@ func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
 
 // Server implements MLaaS server
 func Server() {
+
 	initLimiter(Config.LimiterPeriod)
 	// gorilla/mux handlers
 	//     http.Handle(basePath("/"), handlers())
