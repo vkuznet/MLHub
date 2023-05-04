@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>MLHub upload</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{.Base}}/css/top.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/superkube@latest/dist/superkube.min.css">
+</head>
+<body>
+
+<header>
+    <h1 class="white">MLHub: upload</h1>
+    <div class="white">
+        <a href="{{.Base}}/" class="button button-light-outline button-small button-round">Home</a>
+        &nbsp;
+        <a href="{{.Base}}/models" class="button button-light-outline button-small button-round">Models</a>
+        &nbsp;
+        <a href="{{.Base}}/apis" class="button button-light-outline button-small button-round">APIs</a>
+        &nbsp;
+        <a href="{{.Base}}/docs" class="button button-light-outline button-small button-round">Documentation</a>
+    </div>
+</header>
+
+<section>
+   <article>
+    <form class="form">
+        <div class="form-item">
+            <label>ML name <span class="hint hint-req">*</span></label>
+            <input class="input" type="text" name="name">
+        </div>
+        <div class="form-item">
+            <label>ML type <span class="hint hint-req">*</span></label>
+            <select class="input">
+                <option value="TensorFlow">TensorFlow</option>
+                <option value="PyTorch">PyTorch</option>
+                <option value="ScikitLearn">ScikitLearn</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>Description <span class="hint hint-req">*</span></label>
+            <textarea class="input" name="description" rows="6"></textarea>
+        </div>
+        <div class="form-item">
+            <label>ML model file (tar-ball) <span class="hint hint-req">*</span></label>
+            <input class="input" type="file" name="file">
+        </div>
+        <div class="form-item">
+            <button class="button button-primary">Upload</button>
+        </div>
+    </form>
+  </article>
+</section>
+
+<footer>
+  <p>MLHub &#169; Cornell University</p>
+</footer>
+
+</body>
+</html>
+

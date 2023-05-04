@@ -38,6 +38,7 @@ func handlers() *mux.Router {
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict/image"), PredictHandler).Methods("GET", "POST")
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict"), PredictHandler).Methods("GET", "POST")
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/upload"), UploadHandler)
+	router.HandleFunc(basePath("/upload"), UploadHandler)
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/download"), DownloadHandler)
 	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}"), RequestHandler)
 	router.HandleFunc(basePath("/models"), ModelsHandler).Methods("GET")
@@ -67,17 +68,19 @@ func bunRouter() *bunrouter.CompatRouter {
 		bunrouter.Use(bunrouterLoggingMiddleware),
 		bunrouter.Use(bunrouterLimitMiddleware),
 	).Compat()
-	router.GET("/", RequestHandler)
-	router.GET("/favicon.ico", FaviconHandler)
-	router.GET("/status", StatusHandler)
-	router.GET("/models", ModelsHandler)
-	router.GET("/model/:model/predict/image", PredictHandler)
-	router.POST("/model/:model/predict/image", PredictHandler)
-	router.GET("/model/:model/predict", PredictHandler)
-	router.POST("/model/:model/predict", PredictHandler)
-	router.POST("/model/:model/upload", UploadHandler)
-	router.GET("/model/:model/download", DownloadHandler)
-	router.GET("/model/:model", RequestHandler)
+	base := Config.Base
+	router.GET(base+"/", RequestHandler)
+	router.GET(base+"/favicon.ico", FaviconHandler)
+	router.GET(base+"/status", StatusHandler)
+	router.GET(base+"/models", ModelsHandler)
+	router.GET(base+"/model/:model/predict/image", PredictHandler)
+	router.POST(base+"/model/:model/predict/image", PredictHandler)
+	router.GET(base+"/model/:model/predict", PredictHandler)
+	router.POST(base+"/model/:model/predict", PredictHandler)
+	router.POST(base+"/model/:model/upload", UploadHandler)
+	router.GET(base+"/upload", UploadHandler)
+	router.GET(base+"/model/:model/download", DownloadHandler)
+	router.GET(base+"/model/:model", RequestHandler)
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {

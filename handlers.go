@@ -165,9 +165,16 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 // UploadHandler handles upload action of ML model to back-end server
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	model, rec, err := modelRecord(r)
+	if model == "" {
+		tmpl := make(TmplRecord)
+		tmpl["Base"] = Config.Base
+		tmpl["ServerInfo"] = info()
+		page := tmplPage("upload.tmpl", tmpl)
+		w.Write([]byte(page))
+		return
+	}
 	if err != nil {
 		httpError(w, r, BadRequest, err, http.StatusBadRequest)
-		return
 	}
 	// check if we provided with proper form data
 	if !formData(r) {

@@ -1,15 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>CMS Monitoring</title>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="{{.Base}}/css/records.css" />
+    <title>MLHubi records</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{.Base}}/css/records.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/superkube@latest/dist/superkube.min.css">
 </head>
 <body>
 
 <header>
-    <h2>ML Hub</h2>
+    <h1 class="white">MLHub: models</h1>
+    <div class="white">
+        <a href="{{.Base}}/" class="button button-light-outline button-small button-round">Home</a>
+        &nbsp;
+        <a href="{{.Base}}/upload" class="button button-light-outline button-small button-round">Upload</a>
+        &nbsp;
+        <a href="{{.Base}}/apis" class="button button-light-outline button-small button-round">APIs</a>
+        &nbsp;
+        <a href="{{.Base}}/docs" class="button button-light-outline button-small button-round">Documentation</a>
+    </div>
 </header>
 
 <section>
@@ -19,7 +29,7 @@
         Model: {{$rec.Model}}
         <br/>
         Type: {{$rec.Type}}
-        <hr/>
+        <br/>
         Description: {{$rec.Description}}
         <hr/>
     </div> <!-- div record -->
