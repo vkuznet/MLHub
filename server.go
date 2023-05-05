@@ -71,19 +71,24 @@ func bunRouter() *bunrouter.CompatRouter {
 	base := Config.Base
 	router.GET(base+"/", RequestHandler)
 	router.GET(base+"/favicon.ico", FaviconHandler)
-	router.GET(base+"/status", StatusHandler)
-	router.GET(base+"/models", ModelsHandler)
+
+	// model APIs
 	router.GET(base+"/model/:model/predict/image", PredictHandler)
 	router.POST(base+"/model/:model/predict/image", PredictHandler)
 	router.GET(base+"/model/:model/predict", PredictHandler)
 	router.POST(base+"/model/:model/predict", PredictHandler)
 	router.POST(base+"/model/:model/upload", UploadHandler)
-	router.GET(base+"/upload", UploadHandler)
 	router.GET(base+"/model/:model/download", DownloadHandler)
 	router.GET(base+"/model/:model", RequestHandler)
 
+	// web APIs
+	router.GET(base+"/status", StatusHandler)
+	router.GET(base+"/models", ModelsHandler)
+	router.GET(base+"/upload", UploadHandler)
+	router.POST(base+"/upload", UploadHandler)
 	router.GET(base+"/apis", APIsHandler)
 	router.GET(base+"/docs", DocsHandler)
+
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
 		m := fmt.Sprintf("%s/%s", Config.Base, dir)
@@ -178,10 +183,21 @@ func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
+// helper function to initialize server parametes
+func initServer() {
+	// check if our storage dir exist
+	err := os.MkdirAll(Config.StorageDir, 0755)
+	if err != nil {
+		log.Println("ERROR", err)
+	}
+}
+
 // Server implements MLaaS server
 func Server() {
 
+	initServer()
 	initLimiter(Config.LimiterPeriod)
+
 	// gorilla/mux handlers
 	//     http.Handle(basePath("/"), handlers())
 

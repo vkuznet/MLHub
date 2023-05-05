@@ -1,6 +1,6 @@
 <section>
    <article>
-    <form class="form">
+    <form method="post" class="form" action="{{.Base}}/upload" enctype="multipart/form-data">
         <div class="form-item">
             <label>ML name <span class="hint hint-req">*</span></label>
             <input class="input" type="text" name="name">
@@ -12,6 +12,14 @@
                 <option value="PyTorch">PyTorch</option>
                 <option value="ScikitLearn">ScikitLearn</option>
             </select>
+        </div>
+        <div class="form-item">
+            <label>Version <span class="hint hint-req">*</span></label>
+            <input class="input" type="text" name="version" placeholder="vX.Y.Z">
+        </div>
+        <div class="form-item">
+            <label>Reference </label>
+            <input class="input" type="text" name="reference" placeholder="http://some.site">
         </div>
         <div class="form-item">
             <label>Description <span class="hint hint-req">*</span></label>

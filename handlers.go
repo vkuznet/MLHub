@@ -10,8 +10,11 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -165,30 +168,90 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 // UploadHandler handles upload action of ML model to back-end server
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	model, rec, err := modelRecord(r)
-	if model == "" {
-		tmpl := make(TmplRecord)
-		tmpl["Title"] = "MLHub upload"
-		tmpl["Base"] = Config.Base
-		tmpl["ServerInfo"] = info()
+	tmpl := make(TmplRecord)
+	tmpl["Title"] = "MLHub upload"
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+	top := tmplPage("top.tmpl", tmpl)
+	bottom := tmplPage("bottom.tmpl", tmpl)
+	if r.Method == "GET" {
 		page := tmplPage("upload.tmpl", tmpl)
-		top := tmplPage("top.tmpl", tmpl)
-		bottom := tmplPage("bottom.tmpl", tmpl)
 		w.Write([]byte(top + page + bottom))
 		return
 	}
-	if err != nil {
-		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+
+	// This handler processes two types of POST HTTP requests
+	// POST client for /model/:model/upload API
+	if strings.Contains(r.URL.Path, "/model") {
+		model, rec, err := modelRecord(r)
+		if err != nil {
+			httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		}
+		// check if we provided with proper form data
+		if !formData(r) {
+			httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
+			return
+		}
+		err = Upload(model, rec, r)
+		if err != nil {
+			httpError(w, r, BadRequest, err, http.StatusInternalServerError)
+		}
 	}
-	// check if we provided with proper form data
-	if !formData(r) {
-		httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
+
+	// - web HTML form for /upload API
+	model := r.FormValue("name")
+	mlType := r.FormValue("type")
+	version := r.FormValue("version")
+	reference := r.FormValue("reference")
+	description := r.FormValue("description")
+	if Config.Verbose > 0 {
+		log.Printf("UploadHandler form: model=%s type=%s version=%s reference=%s description=%s", model, mlType, version, reference, description)
+	}
+	// parse incoming HTTP request multipart form
+	err := r.ParseMultipartForm(32 << 20) // maxMemory
+	if err == nil {
+		if file, handler, err := r.FormFile("file"); err == nil {
+			defer file.Close()
+			fname := filepath.Join(Config.StorageDir, handler.Filename)
+			dst, err := os.Create(fname)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer dst.Close()
+			if _, err := io.Copy(dst, file); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	} else {
+		tmpl["Content"] = fmt.Sprintf("Unable to insert ML model <b>%s</b>, error: %v", model, err)
+		page := tmplPage("error.tmpl", tmpl)
+		w.Write([]byte(top + page + bottom))
 		return
 	}
-	err = Upload(model, rec, r)
-	if err != nil {
-		httpError(w, r, BadRequest, err, http.StatusInternalServerError)
+
+	// we got HTML form request
+	tmpl["Content"] = fmt.Sprintf("ML model <b>%s</b> has been successfully uploaded to MLHub", model)
+	rec := Record{
+		Model:       model,
+		Type:        mlType,
+		Version:     version,
+		Description: description,
+		Reference:   reference,
 	}
+	// insert record into MetaData database
+	records := []Record{rec}
+	err = MongoUpsert(Config.DBName, Config.DBColl, records)
+	var page string
+	if err == nil {
+		page = tmplPage("success.tmpl", tmpl)
+	} else {
+		tmpl["Content"] = fmt.Sprintf("Unable to insert ML model <b>%s</b>, error: %v", model, err)
+		page = tmplPage("error.tmpl", tmpl)
+	}
+	w.Write([]byte(top + page + bottom))
+	return
 }
 
 // GetHandler handles GET HTTP requests

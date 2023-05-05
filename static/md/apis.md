@@ -18,7 +18,7 @@ curl -X POST \
   ML meta-data JSON record
 ```
 # post ML meta-data
-curl -X PUTT \
+curl -X PUT \
      -H "content-type: application/json" \
      -d '{"model": "mnist", "type": "TensorFlow", "meta": {"param": 1}}' \
      http://localhost:port/model/mnist
