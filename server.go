@@ -83,11 +83,15 @@ func bunRouter() *bunrouter.CompatRouter {
 
 	// web APIs
 	router.GET(base+"/status", StatusHandler)
+	router.GET(base+"/docs", DocsHandler)
 	router.GET(base+"/models", ModelsHandler)
 	router.GET(base+"/upload", UploadHandler)
+	router.GET(base+"/domains", DomainsHandler)
+	router.GET(base+"/download", DownloadHandler)
+	router.GET(base+"/inference", InferenceHandler)
+	// POST APIs
 	router.POST(base+"/upload", UploadHandler)
-	router.GET(base+"/apis", APIsHandler)
-	router.GET(base+"/docs", DocsHandler)
+	router.POST(base+"/predict", PredictHandler)
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
@@ -97,6 +101,11 @@ func bunRouter() *bunrouter.CompatRouter {
 		// invoke bunrouter from Compat to setup static content
 		router.Router.GET(m+"/*path", bunrouter.HTTPHandler(hdlr))
 	}
+
+	// static model download area
+	hdlr := http.FileServer(http.Dir(Config.StorageDir))
+	router.Router.GET("/bundle/*path", bunrouter.HTTPHandler(hdlr))
+
 	return router
 }
 
@@ -183,23 +192,16 @@ func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// helper function to initialize server parametes
-func initServer() {
-	// check if our storage dir exist
-	err := os.MkdirAll(Config.StorageDir, 0755)
-	if err != nil {
-		log.Println("ERROR", err)
-	}
-}
-
 // Server implements MLaaS server
 func Server() {
 
-	initServer()
+	// initialize server middleware
 	initLimiter(Config.LimiterPeriod)
 
+	// setup server router
+
 	// gorilla/mux handlers
-	//     http.Handle(basePath("/"), handlers())
+	// http.Handle(basePath("/"), handlers())
 
 	// bunrouter implementation of the router
 	router := bunRouter()
