@@ -176,7 +176,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
 	// form link to download the model bundle
-	downloadURL := fmt.Sprintf("%s/%s/%s", Config.StaticDir, rec.Type, model)
+	downloadURL := fmt.Sprintf("/bundles/%s/%s", rec.Type, model)
 	http.Redirect(w, r, downloadURL, http.StatusSeeOther)
 
 	/*

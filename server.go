@@ -104,7 +104,7 @@ func bunRouter() *bunrouter.CompatRouter {
 
 	// static model download area
 	hdlr := http.FileServer(http.Dir(Config.StorageDir))
-	router.Router.GET("/bundle/*path", bunrouter.HTTPHandler(hdlr))
+	router.Router.GET("/bundles/*path", bunrouter.HTTPHandler(hdlr))
 
 	return router
 }
