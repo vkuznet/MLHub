@@ -1,0 +1,49 @@
+<section>
+   <article>
+    <form method="post" class="form" action="{{.Base}}/predict" enctype="multipart/form-data">
+        <div class="form-item">
+            <label>ML name <span class="hint hint-req">*</span></label>
+            <input class="input" type="text" name="name">
+        </div>
+        <div class="form-item">
+            <label>ML type <span class="hint hint-req">*</span></label>
+            <select class="input">
+                <option value="TensorFlow" selected="selected">TensorFlow</option>
+                <option value="PyTorch">PyTorch</option>
+                <option value="ScikitLearn">ScikitLearn</option>
+            </select>
+        </div>
+        <div class="form-item">
+            <label>Version <span class="hint hint-req">*</span></label>
+            <input class="input" type="text" name="version" placeholder="vX.Y.Z">
+        </div>
+        <div class="grid">
+            <div class="column column-5">
+                <div class="form-item">
+                    <label>ML input vector<span class="hint hint-req">*</span></label>
+                    <input class="input" type="text" name="mlinput">
+                </div>
+            </div>
+            <div class="column column-2">
+                <img src="https://cdn.onlinewebfonts.com/svg/img_124688.png" alt="OR" style="width:75px;">
+            </div>
+            <div class="column column-5">
+                <div class="form-item">
+                    <label>ML input file (e.g. image) <span class="hint hint-req">*</span></label>
+                    <input class="input" type="file" name="file">
+                </div>
+            </div>
+        </div>
+        <div class="form-item">
+            <button class="button button-primary">Submit</button>
+        </div>
+    </form>
+
+    <hr/>
+
+    <div>
+        {{.Content}}
+    </div>
+
+  </article>
+</section>
