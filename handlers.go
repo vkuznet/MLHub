@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"strings"
@@ -167,10 +168,13 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	model, rec, err := modelRecord(r)
 	if model == "" {
 		tmpl := make(TmplRecord)
+		tmpl["Title"] = "MLHub upload"
 		tmpl["Base"] = Config.Base
 		tmpl["ServerInfo"] = info()
 		page := tmplPage("upload.tmpl", tmpl)
-		w.Write([]byte(page))
+		top := tmplPage("top.tmpl", tmpl)
+		bottom := tmplPage("bottom.tmpl", tmpl)
+		w.Write([]byte(top + page + bottom))
 		return
 	}
 	if err != nil {
@@ -313,11 +317,54 @@ func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tmpl := make(TmplRecord)
+	tmpl["Title"] = "MLHub models"
 	tmpl["Base"] = Config.Base
 	tmpl["ServerInfo"] = info()
 	tmpl["Records"] = records
 	page := tmplPage("models.tmpl", tmpl)
-	w.Write([]byte(page))
+	top := tmplPage("top.tmpl", tmpl)
+	bottom := tmplPage("bottom.tmpl", tmpl)
+	w.Write([]byte(top + page + bottom))
+}
+
+// APIsHandler handles status of MLHub server
+func APIsHandler(w http.ResponseWriter, r *http.Request) {
+	fname := fmt.Sprintf("%s/md/apis.md", Config.StaticDir)
+	content, err := mdToHTML(fname)
+	if err != nil {
+		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+		return
+	}
+
+	tmpl := make(TmplRecord)
+	tmpl["Title"] = "MLHub APIs"
+	tmpl["Content"] = template.HTML(content)
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+
+	page := tmplPage("apis.tmpl", tmpl)
+	top := tmplPage("top.tmpl", tmpl)
+	bottom := tmplPage("bottom.tmpl", tmpl)
+	w.Write([]byte(top + page + bottom))
+}
+
+// DocsHandler handles status of MLHub server
+func DocsHandler(w http.ResponseWriter, r *http.Request) {
+	fname := fmt.Sprintf("%s/md/docs.md", Config.StaticDir)
+	content, err := mdToHTML(fname)
+	if err != nil {
+		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+		return
+	}
+	tmpl := make(TmplRecord)
+	tmpl["Title"] = "MLHub documentation"
+	tmpl["Content"] = template.HTML(content)
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+	page := tmplPage("docs.tmpl", tmpl)
+	top := tmplPage("top.tmpl", tmpl)
+	bottom := tmplPage("bottom.tmpl", tmpl)
+	w.Write([]byte(top + page + bottom))
 }
 
 // StatusHandler handles status of MLHub server

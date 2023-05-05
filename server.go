@@ -82,6 +82,8 @@ func bunRouter() *bunrouter.CompatRouter {
 	router.GET(base+"/model/:model/download", DownloadHandler)
 	router.GET(base+"/model/:model", RequestHandler)
 
+	router.GET(base+"/apis", APIsHandler)
+	router.GET(base+"/docs", DocsHandler)
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
 		m := fmt.Sprintf("%s/%s", Config.Base, dir)
