@@ -149,21 +149,49 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 
 // DownloadHandler handles download action of ML model from back-end server
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
-	_, rec, err := modelRecord(r)
+	if r.Method == "GET" && !strings.Contains(r.URL.Path, "/model") {
+		fname := fmt.Sprintf("%s/md/download.md", Config.StaticDir)
+		content, err := mdToHTML(fname)
+		if err != nil {
+			httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+			return
+		}
+
+		tmpl := make(TmplRecord)
+		tmpl["Title"] = "MLHub download"
+		tmpl["Content"] = template.HTML(content)
+		tmpl["Base"] = Config.Base
+		tmpl["ServerInfo"] = info()
+
+		page := tmplPage("download.tmpl", tmpl)
+		top := tmplPage("top.tmpl", tmpl)
+		bottom := tmplPage("bottom.tmpl", tmpl)
+		w.Write([]byte(top + page + bottom))
+		return
+	}
+
+	// CLI /model/:mname/download
+	model, rec, err := modelRecord(r)
 	if err != nil {
 		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
-	if _, ok := Config.MLBackends[rec.Type]; ok {
-		bundle, err := Download(rec.Model)
-		if err != nil {
-			httpError(w, r, BadRequest, errors.New("unable to download data from backend"), http.StatusInternalServerError)
-			return
+	// form link to download the model bundle
+	downloadURL := fmt.Sprintf("%s/%s/%s", Config.StaticDir, rec.Type, model)
+	http.Redirect(w, r, downloadURL, http.StatusSeeOther)
+
+	/*
+		if _, ok := Config.MLBackends[rec.Type]; ok {
+			bundle, err := Download(rec.Model)
+			if err != nil {
+				httpError(w, r, BadRequest, errors.New("unable to download data from backend"), http.StatusInternalServerError)
+				return
+			}
+			w.Write(bundle)
+		} else {
+			msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
+			httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
 		}
-		w.Write(bundle)
-	} else {
-		msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
-		httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
-	}
+	*/
 }
 
 // UploadHandler handles upload action of ML model to back-end server
@@ -203,16 +231,23 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	mlType := r.FormValue("type")
 	version := r.FormValue("version")
 	reference := r.FormValue("reference")
+	discipline := r.FormValue("discipline")
 	description := r.FormValue("description")
 	if Config.Verbose > 0 {
-		log.Printf("UploadHandler form: model=%s type=%s version=%s reference=%s description=%s", model, mlType, version, reference, description)
+		log.Printf("UploadHandler form: model=%s type=%s version=%s reference=%s discipline=%s description=%s", model, mlType, version, reference, discipline, description)
 	}
 	// parse incoming HTTP request multipart form
 	err := r.ParseMultipartForm(32 << 20) // maxMemory
 	if err == nil {
 		if file, handler, err := r.FormFile("file"); err == nil {
 			defer file.Close()
-			fname := filepath.Join(Config.StorageDir, handler.Filename)
+			modelDir := fmt.Sprintf("%s/%s/%s", Config.StorageDir, mlType, model)
+			err := os.MkdirAll(modelDir, 0755)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			fname := filepath.Join(modelDir, handler.Filename)
 			dst, err := os.Create(fname)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -238,6 +273,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		Type:        mlType,
 		Version:     version,
 		Description: description,
+		Discipline:  discipline,
 		Reference:   reference,
 	}
 	// insert record into MetaData database
@@ -390,9 +426,9 @@ func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(top + page + bottom))
 }
 
-// APIsHandler handles status of MLHub server
-func APIsHandler(w http.ResponseWriter, r *http.Request) {
-	fname := fmt.Sprintf("%s/md/apis.md", Config.StaticDir)
+// InferenceHandler handles status of MLHub server
+func InferenceHandler(w http.ResponseWriter, r *http.Request) {
+	fname := fmt.Sprintf("%s/md/inference.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
 	if err != nil {
 		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
@@ -400,12 +436,12 @@ func APIsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tmpl := make(TmplRecord)
-	tmpl["Title"] = "MLHub APIs"
+	tmpl["Title"] = "MLHub inference"
 	tmpl["Content"] = template.HTML(content)
 	tmpl["Base"] = Config.Base
 	tmpl["ServerInfo"] = info()
 
-	page := tmplPage("apis.tmpl", tmpl)
+	page := tmplPage("inference.tmpl", tmpl)
 	top := tmplPage("top.tmpl", tmpl)
 	bottom := tmplPage("bottom.tmpl", tmpl)
 	w.Write([]byte(top + page + bottom))
@@ -425,6 +461,25 @@ func DocsHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl["Base"] = Config.Base
 	tmpl["ServerInfo"] = info()
 	page := tmplPage("docs.tmpl", tmpl)
+	top := tmplPage("top.tmpl", tmpl)
+	bottom := tmplPage("bottom.tmpl", tmpl)
+	w.Write([]byte(top + page + bottom))
+}
+
+// DomainsHandler handles status of MLHub server
+func DomainsHandler(w http.ResponseWriter, r *http.Request) {
+	fname := fmt.Sprintf("%s/md/domains.md", Config.StaticDir)
+	content, err := mdToHTML(fname)
+	if err != nil {
+		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+		return
+	}
+	tmpl := make(TmplRecord)
+	tmpl["Title"] = "MLHub scientific domains (disciplines)"
+	tmpl["Content"] = template.HTML(content)
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+	page := tmplPage("domains.tmpl", tmpl)
 	top := tmplPage("top.tmpl", tmpl)
 	bottom := tmplPage("bottom.tmpl", tmpl)
 	w.Write([]byte(top + page + bottom))
