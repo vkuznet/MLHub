@@ -123,19 +123,19 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 
 // PredictHandler handles GET HTTP requests
 func PredictHandler(w http.ResponseWriter, r *http.Request) {
-	model, rec, err := modelRecord(r)
+	rec, err := modelRecord(r)
 	if err != nil {
 		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
 	if backend, ok := Config.MLBackends[rec.Type]; ok {
 		path := r.RequestURI
-		bPath := strings.Replace(path, fmt.Sprintf("/model/%s", model), "", -1)
+		bPath := strings.Replace(path, fmt.Sprintf("/model/%s", rec.Model), "", -1)
 		uri := fmt.Sprintf("%s", backend.URI)
 		rurl := uri + bPath
 		if Config.Verbose > 0 {
-			log.Printf("get predictions from %s model at %s", model, rurl)
+			log.Printf("get predictions from %s model at %s", rec.Model, rurl)
 		}
-		data, err := Predict(rurl, model, r)
+		data, err := Predict(rurl, rec.Model, r)
 		if err == nil {
 			w.Write(data)
 		} else {
@@ -171,27 +171,13 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// CLI /model/:mname/download
-	model, rec, err := modelRecord(r)
+	rec, err := modelRecord(r)
 	if err != nil {
 		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
 	// form link to download the model bundle
-	downloadURL := fmt.Sprintf("/bundles/%s/%s", rec.Type, model)
+	downloadURL := fmt.Sprintf("/bundles/%s/%s/%s", rec.Type, rec.Model, rec.Version)
 	http.Redirect(w, r, downloadURL, http.StatusSeeOther)
-
-	/*
-		if _, ok := Config.MLBackends[rec.Type]; ok {
-			bundle, err := Download(rec.Model)
-			if err != nil {
-				httpError(w, r, BadRequest, errors.New("unable to download data from backend"), http.StatusInternalServerError)
-				return
-			}
-			w.Write(bundle)
-		} else {
-			msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
-			httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
-		}
-	*/
 }
 
 // UploadHandler handles upload action of ML model to back-end server
@@ -211,7 +197,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// This handler processes two types of POST HTTP requests
 	// POST client for /model/:model/upload API
 	if strings.Contains(r.URL.Path, "/model") {
-		model, rec, err := modelRecord(r)
+		rec, err := modelRecord(r)
 		if err != nil {
 			httpError(w, r, BadRequest, err, http.StatusBadRequest)
 		}
@@ -220,7 +206,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
 			return
 		}
-		err = Upload(model, rec, r)
+		err = Upload(rec, r)
 		if err != nil {
 			httpError(w, r, BadRequest, err, http.StatusInternalServerError)
 		}
@@ -241,7 +227,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		if file, handler, err := r.FormFile("file"); err == nil {
 			defer file.Close()
-			modelDir := fmt.Sprintf("%s/%s/%s", Config.StorageDir, mlType, model)
+			modelDir := fmt.Sprintf("%s/%s/%s/%s", Config.StorageDir, mlType, model, version)
 			err := os.MkdirAll(modelDir, 0755)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

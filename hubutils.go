@@ -94,7 +94,7 @@ func Download(model string) ([]byte, error) {
 }
 
 // Upload function uploads data for given model to MeataData database
-func Upload(model string, rec Record, r *http.Request) error {
+func Upload(rec Record, r *http.Request) error {
 	// read incoming data blog
 	var data []byte
 	var err error
@@ -122,7 +122,7 @@ func Upload(model string, rec Record, r *http.Request) error {
 }
 
 // helper function to get ML record for given HTTP request
-func modelRecord(r *http.Request) (string, Record, error) {
+func modelRecord(r *http.Request) (Record, error) {
 	// look-up given ML name in MetaData database
 	vars := mux.Vars(r)
 	model, ok := vars["model"]
@@ -141,17 +141,17 @@ func modelRecord(r *http.Request) (string, Record, error) {
 		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 		if err != nil {
 			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-			return model, rec, errors.New(msg)
+			return rec, errors.New(msg)
 		}
 		// we should have only one record from MetaData
 		if len(records) != 1 {
 			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
-			return model, rec, errors.New(msg)
+			return rec, errors.New(msg)
 		}
 		rec = records[0]
-		return model, rec, nil
+		return rec, nil
 	}
 	msg := fmt.Sprintf("unable to find %s model", model)
 	err := errors.New(msg)
-	return model, rec, err
+	return rec, err
 }
