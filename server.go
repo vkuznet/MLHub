@@ -92,6 +92,7 @@ func bunRouter() *bunrouter.CompatRouter {
 	// POST APIs
 	router.POST(base+"/upload", UploadHandler)
 	router.POST(base+"/predict", PredictHandler)
+	router.POST(base+"/download", DownloadHandler)
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
@@ -103,8 +104,9 @@ func bunRouter() *bunrouter.CompatRouter {
 	}
 
 	// static model download area
-	hdlr := http.FileServer(http.Dir(Config.StorageDir))
-	router.Router.GET("/bundles/*path", bunrouter.HTTPHandler(hdlr))
+	bpath := fmt.Sprintf("%s/bundles", base)
+	hdlr := http.StripPrefix(bpath, http.FileServer(http.Dir(Config.StorageDir)))
+	router.Router.GET(base+"/bundles/*path", bunrouter.HTTPHandler(hdlr))
 
 	return router
 }
