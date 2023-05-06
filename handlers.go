@@ -177,6 +177,9 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// form link to download the model bundle
 	downloadURL := fmt.Sprintf("/bundles/%s/%s/%s", rec.Type, rec.Model, rec.Version)
+	if Config.Verbose > 0 {
+		log.Println("download", downloadURL)
+	}
 	http.Redirect(w, r, downloadURL, http.StatusSeeOther)
 }
 
