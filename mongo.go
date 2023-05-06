@@ -24,6 +24,7 @@ type Record struct {
 	Description string                 `json:"description"` // ML model description
 	Reference   string                 `json:"reference"`   // ML reference URL
 	Discipline  string                 `json:"discipline"`  // ML discipline
+	Bundle      string                 `json:"bundle"`      // ML bundle file
 }
 
 // ToJSON provides string representation of Record
