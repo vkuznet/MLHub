@@ -123,6 +123,7 @@ func Upload(rec Record, r *http.Request) error {
 
 // helper function to get ML record for given HTTP request
 func modelRecord(r *http.Request) (Record, error) {
+	var rec Record
 	// look-up given ML name in MetaData database
 	vars := mux.Vars(r)
 	model, ok := vars["model"]
@@ -130,8 +131,15 @@ func modelRecord(r *http.Request) (Record, error) {
 		params := bunrouter.ParamsFromContext(r.Context())
 		model, ok = params.Map()["model"]
 	}
+	// final try from the web form (HTTP POST request)
+	if model == "" {
+		model = r.FormValue("name")
+	}
+	if model == "" {
+		msg := fmt.Sprintf("Unable to find model in MetaData database")
+		return rec, errors.New(msg)
+	}
 
-	var rec Record
 	if ok {
 		if Config.Verbose > 0 {
 			log.Printf("get ML model %s meta-data", model)
