@@ -73,12 +73,25 @@ func httpError(w http.ResponseWriter, r *http.Request, code int, err error, http
 		Reason:         err.Error(),
 		HTTPCode:       httpCode,
 	}
-	if data, err := json.Marshal(hrec); err == nil {
-		w.WriteHeader(httpCode)
-		w.Write(data)
-	} else {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	tmpl := make(TmplRecord)
+	tmpl["Base"] = Config.Base
+	tmpl["ServerInfo"] = info()
+	data, err := json.MarshalIndent(hrec, "", "   ")
+	if err != nil {
+		data = []byte(err.Error())
 	}
+	if Config.Verbose > 0 {
+		log.Println("ERROR:", data)
+	}
+	if r.Header.Get("Accept") == "application/json" {
+		w.WriteHeader(httpCode)
+		w.Write([]byte(data))
+		return
+	}
+	tmpl["Content"] = fmt.Sprintf("<pre>%s</pre>", data)
+	page := tmplPage("error.tmpl", tmpl)
+	w.WriteHeader(httpCode)
+	w.Write([]byte(page))
 }
 
 // helper function to check record attributes
@@ -243,18 +256,18 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			modelDir := fmt.Sprintf("%s/%s/%s/%s", Config.StorageDir, mlType, model, version)
 			err := os.MkdirAll(modelDir, 0755)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				httpError(w, r, FileIOError, err, http.StatusInternalServerError)
 				return
 			}
 			fname := filepath.Join(modelDir, handler.Filename)
 			dst, err := os.Create(fname)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				httpError(w, r, FileIOError, err, http.StatusInternalServerError)
 				return
 			}
 			defer dst.Close()
 			if _, err := io.Copy(dst, file); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				httpError(w, r, FileIOError, err, http.StatusInternalServerError)
 				return
 			}
 		}
