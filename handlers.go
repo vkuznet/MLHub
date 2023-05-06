@@ -171,12 +171,22 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// CLI /model/:mname/download
-	rec, err := modelRecord(r)
+	model := r.FormValue("name")
+	mlType := r.FormValue("type")
+	version := r.FormValue("version")
+	// check if record exist in MetaData database
+	spec := bson.M{"model": model, "type": mlType, "version": version}
+	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 	if err != nil {
 		httpError(w, r, BadRequest, err, http.StatusBadRequest)
 	}
+	if len(records) != 1 {
+		msg := fmt.Sprintf("Too many records for provide model=%s type=%s version=%s", model, mlType, version)
+		httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
+	}
+	rec := records[0]
 	// form link to download the model bundle
-	downloadURL := fmt.Sprintf("/bundles/%s/%s/%s", rec.Type, rec.Model, rec.Version)
+	downloadURL := fmt.Sprintf("/bundles/%s/%s/%s/%s", mlType, model, version, rec.Bundle)
 	if Config.Verbose > 0 {
 		log.Println("download", downloadURL)
 	}
@@ -256,7 +266,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// we got HTML form request
-	tmpl["Content"] = fmt.Sprintf("ML model <b>%s</b> has been successfully uploaded to MLHub", model)
+	content := fmt.Sprintf("ML model <b>%s</b> has been successfully uploaded to MLHub", model)
+	tmpl["Content"] = template.HTML(content)
 	rec := Record{
 		Model:       model,
 		Type:        mlType,
