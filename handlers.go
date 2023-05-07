@@ -67,8 +67,9 @@ func tmplPage(tmpl string, tmplData TmplRecord) string {
 		tmplData = make(TmplRecord)
 	}
 	var templates Templates
-	tdir := fmt.Sprintf("%s/templates", Config.StaticDir)
-	page := templates.Tmpl(tdir, tmpl, tmplData)
+	page := templates.Tmpl(tmpl, tmplData)
+	//     tdir := fmt.Sprintf("%s/templates", Config.StaticDir)
+	//     page := templates.TmplFile(tdir, tmpl, tmplData)
 	return page
 }
 

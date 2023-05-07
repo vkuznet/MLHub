@@ -7,7 +7,6 @@ package main
 
 import (
 	"bytes"
-	"embed"
 	"fmt"
 	"html/template"
 	"log"
@@ -89,10 +88,6 @@ func parseTmpl(tdir, tmpl string, data interface{}) string {
 	return buf.String()
 }
 
-// content is our static web server content.
-//go:embed static
-var StaticFs embed.FS
-
 // Templates structure
 type Templates struct {
 	html string
@@ -108,7 +103,7 @@ func (q Templates) TmplFile(tdir, tfile string, tmplData map[string]interface{})
 }
 
 // Tmpl method for ServerTemplates structure
-func (q Templates) Tmpl(tdir, tfile string, tmplData map[string]interface{}) string {
+func (q Templates) Tmpl(tfile string, tmplData map[string]interface{}) string {
 	if q.html != "" {
 		return q.html
 	}

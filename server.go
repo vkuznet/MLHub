@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/tls"
+	"embed"
 	"encoding/base64"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -15,6 +17,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/uptrace/bunrouter"
 )
+
+// content is our static web server content.
+//go:embed static
+var StaticFs embed.FS
 
 // helper function to get base path
 func basePath(s string) string {
@@ -96,11 +102,22 @@ func bunRouter() *bunrouter.CompatRouter {
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
+		filesFS, err := fs.Sub(StaticFs, "static/"+dir)
+		if err != nil {
+			panic(err)
+		}
 		m := fmt.Sprintf("%s/%s", Config.Base, dir)
-		d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
-		hdlr := http.StripPrefix(m, http.FileServer(http.Dir(d)))
-		// invoke bunrouter from Compat to setup static content
+		fileServer := http.FileServer(http.FS(filesFS))
+		hdlr := http.StripPrefix(m, fileServer)
 		router.Router.GET(m+"/*path", bunrouter.HTTPHandler(hdlr))
+
+		/*
+			m := fmt.Sprintf("%s/%s", Config.Base, dir)
+			d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
+			hdlr := http.StripPrefix(m, http.FileServer(http.Dir(d)))
+			// invoke bunrouter from Compat to setup static content
+			router.Router.GET(m+"/*path", bunrouter.HTTPHandler(hdlr))
+		*/
 	}
 
 	// static model download area
