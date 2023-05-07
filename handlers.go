@@ -10,11 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -37,6 +34,22 @@ type HTTPError struct {
 	Reason         string `json:"reason"`           // error message
 }
 
+// HTTPResponse rpresents HTTP JSON response
+type HTTPResponse struct {
+	Method         string `json:"method"`           // HTTP method
+	Path           string `json:"path"`             // URL path
+	UserAgent      string `json:"user_agent"`       // http user-agent field
+	XForwardedHost string `json:"x_forwarded_host"` // http.Request X-Forwarded-Host
+	XForwardedFor  string `json:"x_forwarded_for"`  // http.Request X-Forwarded-For
+	RemoteAddr     string `json:"remote_addr"`      // http.Request remote address
+	HTTPCode       int    `json:"http_code"`        // HTTP error code
+	Code           int    `json:"code"`             // server status code
+	Reason         string `json:"reason"`           // error code reason
+	Timestamp      string `json:"timestamp"`        // timestamp of the error
+	Message        string `json:"message"`          // response message
+	Error          string `json:"error"`            // error message
+}
+
 // helper function to get model name from http request
 func getModel(r *http.Request) (string, bool) {
 	vars := mux.Vars(r)
@@ -57,6 +70,47 @@ func tmplPage(tmpl string, tmplData TmplRecord) string {
 	tdir := fmt.Sprintf("%s/templates", Config.StaticDir)
 	page := templates.Tmpl(tdir, tmpl, tmplData)
 	return page
+}
+
+// helper function to generate JSON response
+func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
+	httpCode := tmpl.Int("HttpCode")
+	code := tmpl.Int("Code")
+	top := tmpl.String("Top")
+	bottom := tmpl.String("Bottom")
+	page := tmpl.String("Page")
+	msg := tmpl.String("Content")
+	if r.Header.Get("Accept") != "application/json" {
+		w.WriteHeader(httpCode)
+		w.Write([]byte(top + page + bottom))
+		return
+	}
+	if httpCode == 0 {
+		httpCode = http.StatusOK
+	}
+	hrec := HTTPResponse{
+		Method:         r.Method,
+		Path:           r.RequestURI,
+		RemoteAddr:     r.RemoteAddr,
+		XForwardedFor:  r.Header.Get("X-Forwarded-For"),
+		XForwardedHost: r.Header.Get("X-Forwarded-Host"),
+		UserAgent:      r.Header.Get("User-agent"),
+		Timestamp:      time.Now().String(),
+		Code:           code,
+		Reason:         errorMessage(code),
+		HTTPCode:       httpCode,
+		Message:        msg,
+		Error:          tmpl.String("Error"),
+	}
+	if Config.Verbose > 0 {
+		log.Printf("HTTPResponse: %+v", hrec)
+	}
+	data, err := json.MarshalIndent(hrec, "", "   ")
+	if err != nil {
+		data = []byte(err.Error())
+	}
+	w.WriteHeader(httpCode)
+	w.Write([]byte(data))
 }
 
 // helper function to provide standard HTTP error reply
@@ -184,7 +238,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// CLI /model/:mname/download
-	model := r.FormValue("name")
+	model := r.FormValue("model")
 	mlType := r.FormValue("type")
 	version := r.FormValue("version")
 	// check if record exist in MetaData database
@@ -214,93 +268,93 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl["ServerInfo"] = info()
 	top := tmplPage("top.tmpl", tmpl)
 	bottom := tmplPage("bottom.tmpl", tmpl)
+	tmpl["Top"] = top
+	tmpl["Bottom"] = bottom
+
+	// handle web GET request to upload page
 	if r.Method == "GET" {
 		page := tmplPage("upload.tmpl", tmpl)
 		w.Write([]byte(top + page + bottom))
 		return
 	}
 
-	// This handler processes two types of POST HTTP requests
-	// POST client for /model/:model/upload API
-	if strings.Contains(r.URL.Path, "/model") {
-		rec, err := modelRecord(r)
-		if err != nil {
-			httpError(w, r, BadRequest, err, http.StatusBadRequest)
-		}
-		// check if we provided with proper form data
-		if !formData(r) {
-			httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
-			return
-		}
-		err = Upload(rec, r)
-		if err != nil {
-			httpError(w, r, BadRequest, err, http.StatusInternalServerError)
-		}
-	}
-
-	// - web HTML form for /upload API
-	model := r.FormValue("name")
-	mlType := r.FormValue("type")
-	version := r.FormValue("version")
-	reference := r.FormValue("reference")
-	discipline := r.FormValue("discipline")
-	description := r.FormValue("description")
-	if Config.Verbose > 0 {
-		log.Printf("UploadHandler form: model=%s type=%s version=%s reference=%s discipline=%s description=%s", model, mlType, version, reference, discipline, description)
-	}
-	// parse incoming HTTP request multipart form
-	err := r.ParseMultipartForm(32 << 20) // maxMemory
-	if err == nil {
-		if file, handler, err := r.FormFile("file"); err == nil {
-			defer file.Close()
-			modelDir := fmt.Sprintf("%s/%s/%s/%s", Config.StorageDir, mlType, model, version)
-			err := os.MkdirAll(modelDir, 0755)
-			if err != nil {
-				httpError(w, r, FileIOError, err, http.StatusInternalServerError)
-				return
-			}
-			fname := filepath.Join(modelDir, handler.Filename)
-			dst, err := os.Create(fname)
-			if err != nil {
-				httpError(w, r, FileIOError, err, http.StatusInternalServerError)
-				return
-			}
-			defer dst.Close()
-			if _, err := io.Copy(dst, file); err != nil {
-				httpError(w, r, FileIOError, err, http.StatusInternalServerError)
-				return
-			}
-		}
-	} else {
-		tmpl["Content"] = fmt.Sprintf("Unable to insert ML model <b>%s</b>, error: %v", model, err)
-		page := tmplPage("error.tmpl", tmpl)
-		w.Write([]byte(top + page + bottom))
+	// check if we provided with proper form data
+	if !formData(r) {
+		httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
 		return
 	}
 
-	// we got HTML form request
-	content := fmt.Sprintf("ML model <b>%s</b> has been successfully uploaded to MLHub", model)
-	tmpl["Content"] = template.HTML(content)
-	rec := Record{
-		Model:       model,
-		Type:        mlType,
-		Version:     version,
-		Description: description,
-		Discipline:  discipline,
-		Reference:   reference,
-	}
-	// insert record into MetaData database
-	records := []Record{rec}
-	err = MongoUpsert(Config.DBName, Config.DBColl, records)
-	var page string
-	if err == nil {
-		page = tmplPage("success.tmpl", tmpl)
+	// handle upload POST requests
+	var rec Record
+	var err error
+	if strings.Contains(r.URL.Path, "/model") {
+		// POST request to /model/:model/upload API
+		rec, err = modelRecord(r)
+		if err != nil {
+			httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		}
 	} else {
-		tmpl["Content"] = fmt.Sprintf("Unable to insert ML model <b>%s</b>, error: %v", model, err)
-		page = tmplPage("error.tmpl", tmpl)
+		// POST web form request to /upload API
+		model := r.FormValue("model")
+		mlType := r.FormValue("type")
+		bundle := r.FormValue("file")
+		version := r.FormValue("version")
+		reference := r.FormValue("reference")
+		discipline := r.FormValue("discipline")
+		description := r.FormValue("description")
+
+		// get file name bundle
+		if bundle == "" {
+			// parse incoming HTTP request multipart form
+			err := r.ParseMultipartForm(32 << 20) // maxMemory
+			if err != nil {
+				httpError(w, r, BadRequest, err, http.StatusBadRequest)
+			}
+			for _, vals := range r.MultipartForm.File {
+				for _, fh := range vals {
+					bundle = fh.Filename
+				}
+			}
+		}
+
+		// we got HTML form request
+		rec = Record{
+			Model:       model,
+			Type:        mlType,
+			Version:     version,
+			Description: description,
+			Discipline:  discipline,
+			Reference:   reference,
+			Bundle:      bundle,
+		}
 	}
-	w.Write([]byte(top + page + bottom))
-	return
+
+	// default response attribute
+	var page string
+	content := fmt.Sprintf("ML model %s has been successfully uploaded to MLHub", rec.Model)
+	tfile := "success.tmpl"
+
+	// perform upload action
+	err = Upload(rec, r)
+	if Config.Verbose > 0 {
+		log.Printf("Upload %+v, error: %v", rec, err)
+	}
+
+	// prepare proper response
+	if err != nil {
+		content = fmt.Sprintf("Unable to insert ML model %s, error: %v", rec.Model, err)
+		tfile = "error.tmpl"
+		tmpl["Content"] = template.HTML(content)
+		tmpl["Error"] = err.Error()
+		tmpl["HttpCode"] = http.StatusBadRequest
+		tmpl["Code"] = InsertError
+		httpResponse(w, r, tmpl)
+		return
+	}
+	tmpl["Content"] = template.HTML(content)
+	page = tmplPage(tfile, tmpl)
+	tmpl["Page"] = page
+	httpResponse(w, r, tmpl)
 }
 
 // GetHandler handles GET HTTP requests

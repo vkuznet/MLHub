@@ -7,12 +7,35 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
+	"log"
 	"path/filepath"
+	"strconv"
 )
 
 // TmplRecord represent template record
 type TmplRecord map[string]interface{}
+
+// String converts given value for provided key to string data-type
+func (t TmplRecord) String(key string) string {
+	if v, ok := t[key]; ok {
+		return fmt.Sprintf("%v", v)
+	}
+	return ""
+}
+
+// Int converts given value for provided key to int data-type
+func (t TmplRecord) Int(key string) int {
+	if v, ok := t[key]; ok {
+		if val, err := strconv.Atoi(fmt.Sprintf("%v", v)); err == nil {
+			return val
+		} else {
+			log.Println("ERROR:", err)
+		}
+	}
+	return -1
+}
 
 // consume list of templates and release their full path counterparts
 func fileNames(tdir string, filenames ...string) []string {

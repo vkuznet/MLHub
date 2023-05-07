@@ -51,13 +51,27 @@ curl http://localhost:port/models
 ```
 
 ### ML model APIs
+- `/upload` uploads ML model bundle
+```
+# upload ML model with its meta-data
+curl -H 'Accept: application/json' \
+    -F 'file=@/path/mnist.tar.gz' \
+    -F 'model=mnist' \
+    -F 'version=v1.1.1' \
+    -F 'type=TensorFlow' \
+    -F 'description=bla' \
+    -F 'reference=http://site.com' \
+    http://localhost:port/upload
+```
+
 - `/model/<model_name>/upload` uploads ML model bundle
 ```
-# upload ML model
+# upload ML model for existing meta-data
 curl -X POST -H "Content-Encoding: gzip" \
      -H "content-type: application/octet-stream" \
      --data-binary @./mnist.tar.gz \
      http://localhost:port/model/mnist/upload
+
 ```
 - `/model/<model_name>/download` downloads ML model bundle
 ```
@@ -72,7 +86,7 @@ curl -X GET \
      http://localhost:port/model/mnist/predict
 
 # provide prediction for given image file
-curl http://localhost:8083/model/mnist \
+curl http://localhost:8083/model/mnist/predict \
      -F 'image=@./img4.png'
 ```
 

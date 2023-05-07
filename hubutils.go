@@ -7,13 +7,14 @@ package main
 
 import (
 	"bytes"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -85,40 +86,146 @@ func Predict(uri, model string, r *http.Request) ([]byte, error) {
 	return data, err
 }
 
-func Download(model string) ([]byte, error) {
-	// TODO: decide where we'll store ML models
-	// either on disk or in MetaData database
-	//     spec := bson.M{"model": model}
-	//     records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
-	return []byte{}, nil
+// Upload function uploads record to MetaData database, then
+// uploads file to server storage, and finally to ML backend
+func Upload(rec Record, r *http.Request) error {
+	err := uploadRecord(rec)
+	if err != nil {
+		return err
+	}
+	err = uploadStorage(rec, r)
+	if err != nil {
+		return err
+	}
+	err = uploadBundle(rec, r)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-// Upload function uploads data for given model to MeataData database
-func Upload(rec Record, r *http.Request) error {
-	// read incoming data blog
-	var data []byte
-	var err error
-	defer r.Body.Close()
-	if r.Header.Get("Content-Encoding") == "gzip" {
-		r.Header.Del("Content-Length")
-		reader, err := gzip.NewReader(r.Body)
-		if err != nil {
-			return err
-		}
-		data, err = io.ReadAll(GzipReader{reader, r.Body})
-	} else {
-		data, err = io.ReadAll(r.Body)
+// helper function to upload bundle tarball to ML backend
+func uploadRecord(rec Record) error {
+	// insert record into MetaData database
+	records := []Record{rec}
+	if Config.Verbose > 0 {
+		log.Printf("uploadRecord %+v", rec)
 	}
+	err := MongoUpsert(Config.DBName, Config.DBColl, records)
+	return err
+}
+
+// helper function to upload bundle to server storage
+func uploadStorage(rec Record, r *http.Request) error {
+	if Config.Verbose > 0 {
+		log.Printf("uploadStorage %+v", rec)
+	}
+	// parse incoming HTTP request multipart form
+	err := r.ParseMultipartForm(32 << 20) // maxMemory
+	if err != nil {
+		return err
+	}
+	// extract file from HTTP request form
+	file, handler, err := r.FormFile("file")
 	if err != nil {
 		return err
 	}
 
-	if _, ok := Config.MLBackends[rec.Type]; ok {
-		// TODO: implement upload budle to MetaData database, and to specific ML backend
-		// each backend may have different upload APIs
-		log.Println("TODO: upload", string(data))
+	defer file.Close()
+	modelDir := fmt.Sprintf("%s/%s/%s/%s", Config.StorageDir, rec.Type, rec.Model, rec.Version)
+	err = os.MkdirAll(modelDir, 0755)
+	if err != nil {
+		return err
+	}
+	fname := filepath.Join(modelDir, handler.Filename)
+	dst, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+	if _, err := io.Copy(dst, file); err != nil {
+		return err
 	}
 	return nil
+}
+
+// helper function to upload bundle tarball to ML backend
+func uploadBundle(rec Record, r *http.Request) error {
+	if rec.Type == "TensorFlow" {
+		return uploadBundleTFaaS(rec, r)
+	} else if rec.Type == "PyTorch" {
+		return uploadBundleTorch(rec, r)
+	} else if rec.Type == "ScikitLearn" {
+		return uploadBundleScikit(rec, r)
+	}
+	msg := fmt.Sprintf("upload for %s backend is not implemented", rec.Type)
+	return errors.New(msg)
+}
+
+// helper functiont to upload bundle to TFaaS backend
+func uploadBundleTFaaS(rec Record, r *http.Request) error {
+	// curl -v -X POST -H"Content-Encoding: gzip" -H"content-type: application/octet-stream" --data-binary @$model_tarball $turl/upload
+	backend, ok := Config.MLBackends[rec.Type]
+	if !ok {
+		msg := fmt.Sprintf("upload for %s backend is not implemented", rec.Type)
+		return errors.New(msg)
+	}
+
+	// form backe URI
+	uri := fmt.Sprintf("%s/upload", backend.URI)
+	if Config.Verbose > 0 {
+		log.Printf("upload model %s bundle to %s", rec.Model, uri)
+	}
+	// parse incoming HTTP request multipart form
+	err := r.ParseMultipartForm(32 << 20) // maxMemory
+
+	// construct proper request body
+	var body io.Reader
+	for _, vals := range r.MultipartForm.File {
+		for _, fh := range vals {
+			file, err := fh.Open()
+			if err != nil {
+				return err
+			}
+			body = io.NopCloser(file)
+		}
+	}
+
+	// make HTTP request to remote TFaaS server
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	req, err := http.NewRequest("POST", uri, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Type", "application/octet-stream")
+	if Config.Verbose > 0 {
+		log.Printf("New request %+v", req)
+	}
+	rsp, err := client.Do(req)
+	if Config.Verbose > 0 {
+		log.Println("TFaaS response", rsp)
+	}
+	if err == nil {
+		// check response status code
+		if rsp.StatusCode != http.StatusOK {
+			msg := fmt.Sprintf("TFaaS response status %s", rsp.Status)
+			err = errors.New(msg)
+		}
+	}
+	return err
+}
+
+// helper functiont to upload bundle to Torch backend
+func uploadBundleTorch(rec Record, r *http.Request) error {
+	return errors.New("upload for TorchServer backend is not implemented")
+}
+
+// helper functiont to upload bundle to Scikit backend
+func uploadBundleScikit(rec Record, r *http.Request) error {
+	return errors.New("upload for ScikitLearn backend is not implemented")
 }
 
 // helper function to get ML record for given HTTP request
