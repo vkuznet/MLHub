@@ -2,13 +2,68 @@
   <article>
 {{range $rec := .Records}}
     <div class="record">
-        Model: {{$rec.Model}}
+        <span class="width-2">
+            Model:
+        </span>
+        <span class="">
+            {{$rec.Model}}
+        </span>
+
         <br/>
-        Type: {{$rec.Type}}
+
+        <span class="width-2">
+            Type:
+        </span>
+        <span class="">
+            {{$rec.Type}}
+        </span>
+
         <br/>
-        Description: {{$rec.Description}}
-        <hr/>
+
+        <span class="width-2">
+            Version:
+        </span>
+        <span class="">
+            {{$rec.Version}}
+        </span>
+
+        <br/>
+
+        <span class="width-2">
+            Domain:
+        </span>
+        <span class="">
+            {{$rec.Discipline}}
+        </span>
+
+        <br/>
+
+        <span class="width-2">
+            Reference
+        </span>
+        <span class="">
+            {{$rec.Reference}}
+        </span>
+
+        <br/>
+
+        <span class="width-2">
+            Description:
+        </span>
+        <span class="">
+            {{$rec.Description}}
+        </span>
+
+        <br/>
+
+        <span class="width-2">
+            Bundle:
+        </span>
+        <span class="">
+            <a href="/bunles/{{$rec.Type}}/{{$rec.Model}}/{{$rec.Version}}/{{$rec.Bundle}}">{{$rec.Bundle}}</a>
+        </span>
     </div> <!-- div record -->
+    <hr/>
 {{end}}
   </article>
 </section>
