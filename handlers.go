@@ -82,8 +82,14 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 		bottom := tmpl.String("Bottom")
 		tfile := tmpl.String("Template")
 		page := tmplPage(tfile, tmpl)
-		w.WriteHeader(httpCode)
-		w.Write([]byte(top + page + bottom))
+		if httpCode != 0 {
+			w.WriteHeader(httpCode)
+		}
+		if tfile == "index.tmpl" {
+			w.Write([]byte(page))
+		} else {
+			w.Write([]byte(top + page + bottom))
+		}
 		return
 	}
 	if httpCode == 0 {
@@ -101,7 +107,7 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 		Reason:         errorMessage(code),
 		HTTPCode:       httpCode,
 		Response:       content,
-		Error:          tmpl.String("Error"),
+		Error:          tmpl.Error(),
 	}
 	if Config.Verbose > 0 {
 		log.Printf("HTTPResponse: %+v", hrec)
@@ -115,38 +121,24 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 }
 
 // helper function to provide standard HTTP error reply
-func httpError(w http.ResponseWriter, r *http.Request, code int, err error, httpCode int) {
-	hrec := HTTPError{
-		Method:         r.Method,
-		Timestamp:      time.Now().String(),
-		Path:           r.RequestURI,
-		RemoteAddr:     r.RemoteAddr,
-		XForwardedFor:  r.Header.Get("X-Forwarded-For"),
-		XForwardedHost: r.Header.Get("X-Forwarded-Host"),
-		UserAgent:      r.Header.Get("User-agent"),
-		Code:           code,
-		Reason:         err.Error(),
-		HTTPCode:       httpCode,
-	}
+func httpError(w http.ResponseWriter, r *http.Request, tmpl TmplRecord, code int, err error, httpCode int) {
+	tmpl["Code"] = code
+	tmpl["Error"] = err
+	tmpl["HttpCode"] = httpCode
+	tmpl["Content"] = err.Error()
+	tmpl["Template"] = "error.tmpl"
+	httpResponse(w, r, tmpl)
+}
+
+// helper function to make initial template struct
+func makeTmpl(title string) TmplRecord {
 	tmpl := make(TmplRecord)
+	tmpl["Title"] = title
 	tmpl["Base"] = Config.Base
 	tmpl["ServerInfo"] = info()
-	data, err := json.MarshalIndent(hrec, "", "   ")
-	if err != nil {
-		data = []byte(err.Error())
-	}
-	if Config.Verbose > 0 {
-		log.Println("ERROR:", data)
-	}
-	if r.Header.Get("Accept") == "application/json" {
-		w.WriteHeader(httpCode)
-		w.Write([]byte(data))
-		return
-	}
-	tmpl["Content"] = fmt.Sprintf("<pre>%s</pre>", data)
-	page := tmplPage("error.tmpl", tmpl)
-	w.WriteHeader(httpCode)
-	w.Write([]byte(page))
+	tmpl["Top"] = tmplPage("top.tmpl", tmpl)
+	tmpl["Bottom"] = tmplPage("bottom.tmpl", tmpl)
+	return tmpl
 }
 
 // helper function to check record attributes
@@ -191,9 +183,11 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 
 // PredictHandler handles GET HTTP requests
 func PredictHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub predict")
 	rec, err := modelRecord(r)
 	if err != nil {
-		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+		return
 	}
 	if backend, ok := Config.MLBackends[rec.Type]; ok {
 		path := r.RequestURI
@@ -207,21 +201,24 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			w.Write(data)
 		} else {
-			httpError(w, r, BadRequest, err, http.StatusBadRequest)
+			httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+			return
 		}
 	} else {
 		msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
-		httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, errors.New(msg), http.StatusBadRequest)
+		return
 	}
 }
 
 // DownloadHandler handles download action of ML model from back-end server
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub download")
 	if r.Method == "GET" && !strings.Contains(r.URL.Path, "/model") {
 		fname := fmt.Sprintf("%s/md/download.md", Config.StaticDir)
 		content, err := mdToHTML(fname)
 		if err != nil {
-			httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+			httpError(w, r, tmpl, FileIOError, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -246,11 +243,13 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	spec := bson.M{"model": model, "type": mlType, "version": version}
 	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 	if err != nil {
-		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+		return
 	}
 	if len(records) != 1 {
 		msg := fmt.Sprintf("Too many records for provide model=%s type=%s version=%s", model, mlType, version)
-		httpError(w, r, BadRequest, errors.New(msg), http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, errors.New(msg), http.StatusBadRequest)
+		return
 	}
 	rec := records[0]
 	// form link to download the model bundle
@@ -263,25 +262,18 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 // UploadHandler handles upload action of ML model to back-end server
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl := make(TmplRecord)
-	tmpl["Title"] = "MLHub upload"
-	tmpl["Base"] = Config.Base
-	tmpl["ServerInfo"] = info()
-	top := tmplPage("top.tmpl", tmpl)
-	bottom := tmplPage("bottom.tmpl", tmpl)
-	tmpl["Top"] = top
-	tmpl["Bottom"] = bottom
+	tmpl := makeTmpl("MLHub upload")
 
 	// handle web GET request to upload page
 	if r.Method == "GET" {
-		page := tmplPage("upload.tmpl", tmpl)
-		w.Write([]byte(top + page + bottom))
+		tmpl["Template"] = "upload.tmpl"
+		httpResponse(w, r, tmpl)
 		return
 	}
 
 	// check if we provided with proper form data
 	if !formData(r) {
-		httpError(w, r, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, errors.New("unable to get form data"), http.StatusBadRequest)
 		return
 	}
 
@@ -292,7 +284,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		// POST request to /model/:model/upload API
 		rec, err = modelRecord(r)
 		if err != nil {
-			httpError(w, r, BadRequest, err, http.StatusBadRequest)
+			httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+			return
 		}
 	} else {
 		// POST web form request to /upload API
@@ -309,7 +302,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			// parse incoming HTTP request multipart form
 			err := r.ParseMultipartForm(32 << 20) // maxMemory
 			if err != nil {
-				httpError(w, r, BadRequest, err, http.StatusBadRequest)
+				httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+				return
 			}
 			for _, vals := range r.MultipartForm.File {
 				for _, fh := range vals {
@@ -333,13 +327,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// perform upload action
 	err = Upload(rec, r)
 	if err != nil {
-		content := fmt.Sprintf("Unable to insert ML model %s, error: %v", rec.Model, err)
-		tmpl["Content"] = template.HTML(content)
-		tmpl["Template"] = "error.tmpl"
-		tmpl["Error"] = err.Error()
-		tmpl["HttpCode"] = http.StatusBadRequest
-		tmpl["Code"] = InsertError
-		httpResponse(w, r, tmpl)
+		httpError(w, r, tmpl, InsertError, err, http.StatusBadRequest)
 		return
 	}
 	content := fmt.Sprintf("ML model %s has been successfully uploaded to MLHub", rec.Model)
@@ -350,6 +338,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetHandler handles GET HTTP requests
 func GetHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub")
 	model, ok := getModel(r)
 	if ok {
 		if Config.Verbose > 0 {
@@ -360,24 +349,21 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 		if err != nil {
 			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-			httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+			httpError(w, r, tmpl, DatabaseError, errors.New(msg), http.StatusInternalServerError)
 			return
 		}
 		data, err := json.Marshal(records)
 		if err != nil {
 			msg := fmt.Sprintf("unable to marshal data, error=%v", err)
-			httpError(w, r, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
+			httpError(w, r, tmpl, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
 			return
 		}
 		w.Write(data)
 		return
 	}
 	// if we are here we'll show HTTP content
-	tmpl := make(TmplRecord)
-	tmpl["Base"] = Config.Base
-	tmpl["ServerInfo"] = info()
-	page := tmplPage("index.tmpl", tmpl)
-	w.Write([]byte(page))
+	tmpl["Template"] = "index.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // helper function either to create/upsert or update record
@@ -418,24 +404,33 @@ func addRecord(r *http.Request, update bool) error {
 // PostHandler handles POST HTTP requests,
 // this request will create and upload ML models to backend server(s)
 func PostHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub POST API")
 	err := addRecord(r, false)
 	if err != nil {
-		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+		return
 	}
+	tmpl["Template"] = "success.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // PutHandler handles PUT HTTP requests, this request will
 // update ML model in backend or MetaData database
 func PutHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub PUT API")
 	err := addRecord(r, true)
 	if err != nil {
-		httpError(w, r, BadRequest, err, http.StatusBadRequest)
+		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
+		return
 	}
+	tmpl["Template"] = "success.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // GetHandler handles GET HTTP requests, this request will
 // delete ML model in backend and MetaData database
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub DELETE API")
 	model, ok := getModel(r)
 	if ok {
 		if Config.Verbose > 0 {
@@ -445,107 +440,91 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		spec := bson.M{"name": model}
 		err := MongoRemove(Config.DBName, Config.DBColl, spec)
 		if err != nil {
-			httpError(w, r, DatabaseError, err, http.StatusInternalServerError)
+			httpError(w, r, tmpl, DatabaseError, err, http.StatusInternalServerError)
+			return
 		}
+		tmpl["Template"] = "success.tmpl"
+		httpResponse(w, r, tmpl)
 		return
 	}
-	httpError(w, r, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
+	httpError(w, r, tmpl, BadRequest, errors.New("no model name is provided"), http.StatusBadRequest)
 }
 
 // ModelsHandler provides information about registered ML models
 func ModelsHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub models")
 	// TODO: Add parameters for /models endpoint, eg q=query, limit, idx for pagination
 	spec := bson.M{}
 	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-		httpError(w, r, DatabaseError, errors.New(msg), http.StatusInternalServerError)
+		httpError(w, r, tmpl, DatabaseError, errors.New(msg), http.StatusInternalServerError)
 		return
 	}
-	log.Println("### request", r.Header.Get("Accept"), r)
 	if r.Header.Get("Accept") == "application/json" {
 		data, err := json.Marshal(records)
 		if err != nil {
 			msg := fmt.Sprintf("unable to marshal data, error=%v", err)
-			httpError(w, r, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
+			httpError(w, r, tmpl, JsonMarshal, errors.New(msg), http.StatusInternalServerError)
 			return
 		}
 		w.Write(data)
 		return
 	}
-	tmpl := make(TmplRecord)
-	tmpl["Title"] = "MLHub models"
-	tmpl["Base"] = Config.Base
-	tmpl["ServerInfo"] = info()
 	tmpl["Records"] = records
-	page := tmplPage("models.tmpl", tmpl)
-	top := tmplPage("top.tmpl", tmpl)
-	bottom := tmplPage("bottom.tmpl", tmpl)
-	w.Write([]byte(top + page + bottom))
+	tmpl["Template"] = "models.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // InferenceHandler handles status of MLHub server
 func InferenceHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub inference")
 	fname := fmt.Sprintf("%s/md/inference.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
 	if err != nil {
-		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+		httpError(w, r, tmpl, FileIOError, err, http.StatusInternalServerError)
 		return
 	}
 
-	tmpl := make(TmplRecord)
-	tmpl["Title"] = "MLHub inference"
 	tmpl["Content"] = template.HTML(content)
-	tmpl["Base"] = Config.Base
-	tmpl["ServerInfo"] = info()
-
-	page := tmplPage("inference.tmpl", tmpl)
-	top := tmplPage("top.tmpl", tmpl)
-	bottom := tmplPage("bottom.tmpl", tmpl)
-	w.Write([]byte(top + page + bottom))
+	tmpl["Template"] = "inference.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // DocsHandler handles status of MLHub server
 func DocsHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub documentation")
 	fname := fmt.Sprintf("%s/md/docs.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
 	if err != nil {
-		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+		httpError(w, r, tmpl, FileIOError, err, http.StatusInternalServerError)
 		return
 	}
-	tmpl := make(TmplRecord)
-	tmpl["Title"] = "MLHub documentation"
 	tmpl["Content"] = template.HTML(content)
-	tmpl["Base"] = Config.Base
-	tmpl["ServerInfo"] = info()
-	page := tmplPage("docs.tmpl", tmpl)
-	top := tmplPage("top.tmpl", tmpl)
-	bottom := tmplPage("bottom.tmpl", tmpl)
-	w.Write([]byte(top + page + bottom))
+	tmpl["Template"] = "docs.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // DomainsHandler handles status of MLHub server
 func DomainsHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub scientific domains (disciplines)")
 	fname := fmt.Sprintf("%s/md/domains.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
 	if err != nil {
-		httpError(w, r, FileIOError, err, http.StatusInternalServerError)
+		httpError(w, r, tmpl, FileIOError, err, http.StatusInternalServerError)
 		return
 	}
-	tmpl := make(TmplRecord)
-	tmpl["Title"] = "MLHub scientific domains (disciplines)"
 	tmpl["Content"] = template.HTML(content)
-	tmpl["Base"] = Config.Base
-	tmpl["ServerInfo"] = info()
-	page := tmplPage("domains.tmpl", tmpl)
-	top := tmplPage("top.tmpl", tmpl)
-	bottom := tmplPage("bottom.tmpl", tmpl)
-	w.Write([]byte(top + page + bottom))
+	tmpl["Template"] = "domains.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // StatusHandler handles status of MLHub server
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: implement status API from all backend servers
+	tmpl := makeTmpl("MLHub predict")
+	tmpl["Template"] = "status.tmpl"
+	httpResponse(w, r, tmpl)
 }
 
 // RequestHandler handles incoming HTTP requests
@@ -559,7 +538,8 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "DELETE" {
 		DeleteHandler(w, r)
 	} else {
+		tmpl := makeTmpl("MLHub request")
 		msg := fmt.Sprintf("Unsupport HTTP method %s", r.Method)
-		httpError(w, r, BadRequest, errors.New(msg), http.StatusInternalServerError)
+		httpError(w, r, tmpl, BadRequest, errors.New(msg), http.StatusInternalServerError)
 	}
 }

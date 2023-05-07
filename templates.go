@@ -37,6 +37,14 @@ func (t TmplRecord) Int(key string) int {
 	return 0
 }
 
+// Error returns error string
+func (t TmplRecord) Error() string {
+	if v, ok := t["Error"]; ok {
+		return fmt.Sprintf("%v", v)
+	}
+	return ""
+}
+
 // consume list of templates and release their full path counterparts
 func fileNames(tdir string, filenames ...string) []string {
 	flist := []string{}
