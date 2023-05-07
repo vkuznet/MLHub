@@ -46,7 +46,7 @@ type HTTPResponse struct {
 	Code           int    `json:"code"`             // server status code
 	Reason         string `json:"reason"`           // error code reason
 	Timestamp      string `json:"timestamp"`        // timestamp of the error
-	Message        string `json:"message"`          // response message
+	Response       string `json:"response"`         // response message
 	Error          string `json:"error"`            // error message
 }
 
@@ -76,11 +76,12 @@ func tmplPage(tmpl string, tmplData TmplRecord) string {
 func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 	httpCode := tmpl.Int("HttpCode")
 	code := tmpl.Int("Code")
-	top := tmpl.String("Top")
-	bottom := tmpl.String("Bottom")
-	page := tmpl.String("Page")
-	msg := tmpl.String("Content")
+	content := tmpl.String("Content")
 	if r.Header.Get("Accept") != "application/json" {
+		top := tmpl.String("Top")
+		bottom := tmpl.String("Bottom")
+		tfile := tmpl.String("Template")
+		page := tmplPage(tfile, tmpl)
 		w.WriteHeader(httpCode)
 		w.Write([]byte(top + page + bottom))
 		return
@@ -99,7 +100,7 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 		Code:           code,
 		Reason:         errorMessage(code),
 		HTTPCode:       httpCode,
-		Message:        msg,
+		Response:       content,
 		Error:          tmpl.String("Error"),
 	}
 	if Config.Verbose > 0 {
@@ -329,31 +330,21 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// default response attribute
-	var page string
-	content := fmt.Sprintf("ML model %s has been successfully uploaded to MLHub", rec.Model)
-	tfile := "success.tmpl"
-
 	// perform upload action
 	err = Upload(rec, r)
-	if Config.Verbose > 0 {
-		log.Printf("Upload %+v, error: %v", rec, err)
-	}
-
-	// prepare proper response
 	if err != nil {
-		content = fmt.Sprintf("Unable to insert ML model %s, error: %v", rec.Model, err)
-		tfile = "error.tmpl"
+		content := fmt.Sprintf("Unable to insert ML model %s, error: %v", rec.Model, err)
 		tmpl["Content"] = template.HTML(content)
+		tmpl["Template"] = "error.tmpl"
 		tmpl["Error"] = err.Error()
 		tmpl["HttpCode"] = http.StatusBadRequest
 		tmpl["Code"] = InsertError
 		httpResponse(w, r, tmpl)
 		return
 	}
+	content := fmt.Sprintf("ML model %s has been successfully uploaded to MLHub", rec.Model)
 	tmpl["Content"] = template.HTML(content)
-	page = tmplPage(tfile, tmpl)
-	tmpl["Page"] = page
+	tmpl["Template"] = "success.tmpl"
 	httpResponse(w, r, tmpl)
 }
 

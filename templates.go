@@ -34,7 +34,7 @@ func (t TmplRecord) Int(key string) int {
 			log.Println("ERROR:", err)
 		}
 	}
-	return -1
+	return 0
 }
 
 // consume list of templates and release their full path counterparts
