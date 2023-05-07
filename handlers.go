@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/uptrace/bunrouter"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -52,12 +51,8 @@ type HTTPResponse struct {
 
 // helper function to get model name from http request
 func getModel(r *http.Request) (string, bool) {
-	vars := mux.Vars(r)
-	model, ok := vars["model"]
-	if !ok { // no gorilla/mux, try bunrouter params map
-		params := bunrouter.ParamsFromContext(r.Context())
-		model, ok = params.Map()["model"]
-	}
+	params := bunrouter.ParamsFromContext(r.Context())
+	model, ok := params.Map()["model"]
 	return model, ok
 }
 

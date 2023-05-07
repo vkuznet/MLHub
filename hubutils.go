@@ -17,7 +17,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/uptrace/bunrouter"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -231,13 +230,11 @@ func uploadBundleScikit(rec Record, r *http.Request) error {
 // helper function to get ML record for given HTTP request
 func modelRecord(r *http.Request) (Record, error) {
 	var rec Record
-	// look-up given ML name in MetaData database
-	vars := mux.Vars(r)
-	model, ok := vars["model"]
-	if !ok { // no gorilla/mux, try bunrouter params map
-		params := bunrouter.ParamsFromContext(r.Context())
-		model, ok = params.Map()["model"]
-	}
+
+	// look-up model from HTTP request parameters
+	params := bunrouter.ParamsFromContext(r.Context())
+	model, ok := params.Map()["model"]
+
 	// final try from the web form (HTTP POST request)
 	if model == "" {
 		model = r.FormValue("name")
