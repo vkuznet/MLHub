@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/uptrace/bunrouter"
 )
 
@@ -34,38 +33,6 @@ func basePath(s string) string {
 		return fmt.Sprintf("/%s/%s", Config.Base, s)
 	}
 	return s
-}
-
-// http handlers based on gorilla/mux
-func handlers() *mux.Router {
-	router := mux.NewRouter()
-
-	// visible routes
-	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict/image"), PredictHandler).Methods("GET", "POST")
-	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/predict"), PredictHandler).Methods("GET", "POST")
-	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/upload"), UploadHandler)
-	router.HandleFunc(basePath("/upload"), UploadHandler)
-	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}/download"), DownloadHandler)
-	router.HandleFunc(basePath("/model/{model:[a-zA-Z0-9_]+}"), RequestHandler)
-	router.HandleFunc(basePath("/models"), ModelsHandler).Methods("GET")
-	router.HandleFunc(basePath("/status"), StatusHandler).Methods("GET")
-	router.HandleFunc(basePath("/favicon.ico"), FaviconHandler).Methods("GET")
-	router.HandleFunc(basePath("/"), RequestHandler).Methods("GET")
-
-	// static handlers
-	for _, dir := range []string{"js", "css", "images"} {
-		m := fmt.Sprintf("%s/%s/", Config.Base, dir)
-		d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
-		hdlr := http.StripPrefix(m, http.FileServer(http.Dir(d)))
-		http.Handle(m, hdlr)
-	}
-
-	// log all requests
-	router.Use(loggingMiddleware)
-	// use limiter middleware to slow down clients
-	router.Use(limitMiddleware)
-
-	return router
 }
 
 // bunrouter implementation of the compatible (with net/http) router handlers
@@ -218,11 +185,6 @@ func Server() {
 	initLimiter(Config.LimiterPeriod)
 
 	// setup server router
-
-	// gorilla/mux handlers
-	// http.Handle(basePath("/"), handlers())
-
-	// bunrouter implementation of the router
 	router := bunRouter()
 
 	// start HTTPs server
@@ -237,16 +199,12 @@ func Server() {
 		server := &http.Server{
 			Addr:      ":https",
 			TLSConfig: tlsConfig,
-			Handler:   router, // it is not used in gorilla/mux
+			Handler:   router,
 		}
 		log.Printf("Start HTTPs server with %s and %s on :%d", Config.ServerCrt, Config.ServerKey, Config.Port)
 		log.Fatal(server.ListenAndServeTLS(Config.ServerCrt, Config.ServerKey))
 	} else {
 		log.Printf("Start HTTP server on :%d", Config.Port)
-		// for gorilla/mux we do not pass router but rather use http module itself
-		//         http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), nil)
-
-		// for bunrouter we pass router handler
 		http.ListenAndServe(fmt.Sprintf(":%d", Config.Port), router)
 	}
 }
