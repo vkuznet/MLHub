@@ -7,6 +7,7 @@ package main
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
 	"log"
@@ -88,9 +89,22 @@ func parseTmpl(tdir, tmpl string, data interface{}) string {
 	return buf.String()
 }
 
+// content is our static web server content.
+//go:embed static
+var StaticFs embed.FS
+
 // Templates structure
 type Templates struct {
 	html string
+}
+
+// TmplFile method for ServerTemplates structure
+func (q Templates) TmplFile(tdir, tfile string, tmplData map[string]interface{}) string {
+	if q.html != "" {
+		return q.html
+	}
+	q.html = parseTmpl(tdir, tfile, tmplData)
+	return q.html
 }
 
 // Tmpl method for ServerTemplates structure
@@ -98,6 +112,15 @@ func (q Templates) Tmpl(tdir, tfile string, tmplData map[string]interface{}) str
 	if q.html != "" {
 		return q.html
 	}
-	q.html = parseTmpl(tdir, tfile, tmplData)
+
+	// get template from embed.FS
+	filenames := []string{"static/templates/" + tfile}
+	t := template.Must(template.New(tfile).ParseFS(StaticFs, filenames...))
+	buf := new(bytes.Buffer)
+	err := t.Execute(buf, tmplData)
+	if err != nil {
+		panic(err)
+	}
+	q.html = buf.String()
 	return q.html
 }
