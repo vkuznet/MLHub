@@ -11,21 +11,22 @@ import (
 	"html/template"
 	"log"
 	"strconv"
+	"time"
 )
 
 // TmplRecord represent template record
 type TmplRecord map[string]interface{}
 
-// String converts given value for provided key to string data-type
-func (t TmplRecord) String(key string) string {
+// GetString converts given value for provided key to string data-type
+func (t TmplRecord) GetString(key string) string {
 	if v, ok := t[key]; ok {
 		return fmt.Sprintf("%v", v)
 	}
 	return ""
 }
 
-// Int converts given value for provided key to int data-type
-func (t TmplRecord) Int(key string) int {
+// GetInt converts given value for provided key to int data-type
+func (t TmplRecord) GetInt(key string) int {
 	if v, ok := t[key]; ok {
 		if val, err := strconv.Atoi(fmt.Sprintf("%v", v)); err == nil {
 			return val
@@ -36,20 +37,29 @@ func (t TmplRecord) Int(key string) int {
 	return 0
 }
 
-// Error returns error string
-func (t TmplRecord) Error() string {
+// GetError returns error string
+func (t TmplRecord) GetError() string {
 	if v, ok := t["Error"]; ok {
 		return fmt.Sprintf("%v", v)
 	}
 	return ""
 }
 
-// Bytes returns bytes object for given key
-func (t TmplRecord) Bytes(key string) []byte {
+// GetBytes returns bytes object for given key
+func (t TmplRecord) GetBytes(key string) []byte {
 	if data, ok := t[key]; ok {
 		return data.([]byte)
 	}
 	return []byte{}
+}
+
+// GetElapsedTime returns elapsed time
+func (t TmplRecord) GetElapsedTime() string {
+	if val, ok := t["StartTime"]; ok {
+		startTime := time.Unix(val.(int64), 0)
+		return time.Since(startTime).String()
+	}
+	return ""
 }
 
 // Templates structure
