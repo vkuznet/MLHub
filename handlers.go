@@ -46,6 +46,7 @@ type HTTPResponse struct {
 	Timestamp      string `json:"timestamp"`        // timestamp of the error
 	Response       string `json:"response"`         // response message
 	Error          string `json:"error"`            // error message
+	Data           string `json:"data"`             // HTTP response data
 }
 
 // helper function to get model name from http request
@@ -103,6 +104,7 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 		HTTPCode:       httpCode,
 		Response:       content,
 		Error:          tmpl.Error(),
+		Data:           tmpl.String("Data"),
 	}
 	if Config.Verbose > 0 {
 		log.Printf("HTTPResponse: %+v", hrec)
@@ -194,10 +196,10 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		data, err := Predict(rurl, rec, r)
 		if err == nil {
-			tmpl["Content"] = string(data)
+			tmpl["Data"] = strings.Replace(string(data), "\n", "", -1)
 			tmpl["Backend"] = rec.Type
 			if backend, ok := Config.MLBackends[rec.Type]; ok {
-				tmpl["Backend"] = backend
+				tmpl["Backend"] = fmt.Sprintf("%s (%s) response", backend.Name, backend.Type)
 			}
 			tmpl["Template"] = "response.tmpl"
 			httpResponse(w, r, tmpl)

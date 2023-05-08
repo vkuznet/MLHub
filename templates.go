@@ -44,6 +44,14 @@ func (t TmplRecord) Error() string {
 	return ""
 }
 
+// Bytes returns bytes object for given key
+func (t TmplRecord) Bytes(key string) []byte {
+	if data, ok := t[key]; ok {
+		return data.([]byte)
+	}
+	return []byte{}
+}
+
 // Templates structure
 type Templates struct {
 	html string
