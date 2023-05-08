@@ -47,6 +47,7 @@ type HTTPResponse struct {
 	Response       string `json:"response"`         // response message
 	Error          string `json:"error"`            // error message
 	Data           string `json:"data"`             // HTTP response data
+	ElapsedTime    string `json:"elapsed_time"`     // elapsed time of HTTP request
 }
 
 // helper function to get model name from http request
@@ -70,13 +71,16 @@ func tmplPage(tmpl string, tmplData TmplRecord) string {
 
 // helper function to generate JSON response
 func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
-	httpCode := tmpl.Int("HttpCode")
-	code := tmpl.Int("Code")
-	content := tmpl.String("Content")
+	httpCode := tmpl.GetInt("HttpCode")
+	code := tmpl.GetInt("Code")
+	content := tmpl.GetString("Content")
+	tmpl["EndTime"] = time.Now().Unix()
+	elapsedTime := tmpl.GetElapsedTime()
+	tmpl["ElapsedTime"] = elapsedTime
 	if r.Header.Get("Accept") != "application/json" {
-		top := tmpl.String("Top")
-		bottom := tmpl.String("Bottom")
-		tfile := tmpl.String("Template")
+		top := tmpl.GetString("Top")
+		bottom := tmpl.GetString("Bottom")
+		tfile := tmpl.GetString("Template")
 		page := tmplPage(tfile, tmpl)
 		if httpCode != 0 {
 			w.WriteHeader(httpCode)
@@ -103,8 +107,9 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 		Reason:         errorMessage(code),
 		HTTPCode:       httpCode,
 		Response:       content,
-		Error:          tmpl.Error(),
-		Data:           tmpl.String("Data"),
+		Error:          tmpl.GetError(),
+		Data:           tmpl.GetString("Data"),
+		ElapsedTime:    tmpl.GetElapsedTime(),
 	}
 	if Config.Verbose > 0 {
 		log.Printf("HTTPResponse: %+v", hrec)
@@ -135,6 +140,7 @@ func makeTmpl(title string) TmplRecord {
 	tmpl["ServerInfo"] = info()
 	tmpl["Top"] = tmplPage("top.tmpl", tmpl)
 	tmpl["Bottom"] = tmplPage("bottom.tmpl", tmpl)
+	tmpl["StartTime"] = time.Now().Unix()
 	return tmpl
 }
 
