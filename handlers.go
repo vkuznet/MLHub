@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/uptrace/bunrouter"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // HTTPError represents HTTP error record
@@ -193,9 +192,16 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 		if Config.Verbose > 0 {
 			log.Printf("get predictions from %s model at %s", rec.Model, rurl)
 		}
-		data, err := Predict(rurl, rec.Model, r)
+		data, err := Predict(rurl, rec, r)
 		if err == nil {
-			w.Write(data)
+			tmpl["Content"] = string(data)
+			tmpl["Backend"] = rec.Type
+			if backend, ok := Config.MLBackends[rec.Type]; ok {
+				tmpl["Backend"] = backend
+			}
+			tmpl["Template"] = "response.tmpl"
+			httpResponse(w, r, tmpl)
+			return
 		} else {
 			httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
 			return
@@ -236,8 +242,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	mlType := r.FormValue("type")
 	version := r.FormValue("version")
 	// check if record exist in MetaData database
-	spec := bson.M{"model": model, "type": mlType, "version": version}
-	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+	records, err := metadata.Records(model, mlType, version)
 	if err != nil {
 		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
 		return
@@ -341,8 +346,7 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("get ML model %s meta-data", model)
 		}
 		// get ML meta-data
-		spec := bson.M{"model": model}
-		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+		records, err := metadata.Records(model, "", "")
 		if err != nil {
 			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
 			httpError(w, r, tmpl, DatabaseError, errors.New(msg), http.StatusInternalServerError)
@@ -383,13 +387,10 @@ func addRecord(r *http.Request, update bool) error {
 		}
 		if update {
 			// update ML meta-data
-			spec := bson.M{"model": model}
-			meta := bson.M{"model": model, "type": rec.Type, "meta_data": rec.MetaData}
-			err = MongoUpdate(Config.DBName, Config.DBColl, spec, meta)
+			err = metadata.Update(rec)
 		} else {
 			// insert ML meta-data
-			records := []Record{rec}
-			err = MongoUpsert(Config.DBName, Config.DBColl, records)
+			err = metadata.Insert(rec)
 		}
 		return err
 	}
@@ -433,8 +434,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("delete ML model %s", model)
 		}
 		// delete ML model in MetaData database
-		spec := bson.M{"name": model}
-		err := MongoRemove(Config.DBName, Config.DBColl, spec)
+		err := metadata.Remove(model)
 		if err != nil {
 			httpError(w, r, tmpl, DatabaseError, err, http.StatusInternalServerError)
 			return
@@ -450,8 +450,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub models")
 	// TODO: Add parameters for /models endpoint, eg q=query, limit, idx for pagination
-	spec := bson.M{}
-	records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
+	records, err := metadata.Records("", "", "")
 	if err != nil {
 		msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
 		httpError(w, r, tmpl, DatabaseError, errors.New(msg), http.StatusInternalServerError)

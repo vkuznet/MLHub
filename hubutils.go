@@ -17,14 +17,16 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gomarkdown/markdown"
+	mhtml "github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 	"github.com/uptrace/bunrouter"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // Predict function fetches prediction for given uri, model and client's
 // HTTP request. Code is based on the following example:
 // https://golangbyexample.com/http-mutipart-form-body-golang/
-func Predict(uri, model string, r *http.Request) ([]byte, error) {
+func Predict(uri string, rec Record, r *http.Request) ([]byte, error) {
 	// parse incoming HTTP request multipart form
 	err := r.ParseMultipartForm(32 << 20) // maxMemory
 
@@ -39,7 +41,7 @@ func Predict(uri, model string, r *http.Request) ([]byte, error) {
 		}
 	}
 	// add mandatory model field
-	writer.WriteField("model", model)
+	writer.WriteField("model", rec.Model)
 
 	// parse and recreate file form
 	for k, vals := range r.MultipartForm.File {
@@ -64,6 +66,15 @@ func Predict(uri, model string, r *http.Request) ([]byte, error) {
 	}
 	writer.Close()
 
+	// for TFaaS we need additional end-point path if we query image prediction
+	if r.FormValue("name") != "image" && rec.Type == "TensorFlow" {
+		uri += "/image"
+	}
+	if Config.Verbose > 0 {
+		log.Printf("Predict uri=%s HTTP request %+v", uri, r)
+	}
+
+	// form HTTP request
 	var data []byte
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -106,11 +117,10 @@ func Upload(rec Record, r *http.Request) error {
 // helper function to upload bundle tarball to ML backend
 func uploadRecord(rec Record) error {
 	// insert record into MetaData database
-	records := []Record{rec}
 	if Config.Verbose > 0 {
 		log.Printf("uploadRecord %+v", rec)
 	}
-	err := MongoUpsert(Config.DBName, Config.DBColl, records)
+	err := metadata.Insert(rec)
 	return err
 }
 
@@ -233,37 +243,59 @@ func modelRecord(r *http.Request) (Record, error) {
 
 	// look-up model from HTTP request parameters
 	params := bunrouter.ParamsFromContext(r.Context())
-	model, ok := params.Map()["model"]
+	model, _ := params.Map()["model"]
 
 	// final try from the web form (HTTP POST request)
 	if model == "" {
-		model = r.FormValue("name")
+		model = r.FormValue("model")
 	}
 	if model == "" {
 		msg := fmt.Sprintf("Unable to find model in MetaData database")
+		log.Printf("ERROR: %s, HTTP request %+v", msg, r)
 		return rec, errors.New(msg)
 	}
 
-	if ok {
-		if Config.Verbose > 0 {
-			log.Printf("get ML model %s meta-data", model)
-		}
-		// get ML meta-data
-		spec := bson.M{"model": model}
-		records, err := MongoGet(Config.DBName, Config.DBColl, spec, 0, -1)
-		if err != nil {
-			msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
-			return rec, errors.New(msg)
-		}
-		// we should have only one record from MetaData
-		if len(records) != 1 {
-			msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
-			return rec, errors.New(msg)
-		}
-		rec = records[0]
-		return rec, nil
+	if Config.Verbose > 0 {
+		log.Printf("get ML model %s meta-data", model)
 	}
-	msg := fmt.Sprintf("unable to find %s model", model)
-	err := errors.New(msg)
-	return rec, err
+	// get ML meta-data
+	records, err := metadata.Records(rec.Model, rec.Type, rec.Version)
+	if err != nil {
+		msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
+		return rec, errors.New(msg)
+	}
+	// we should have only one record from MetaData
+	if len(records) != 1 {
+		msg := fmt.Sprintf("Incorrect number of MetaData records %+v", records)
+		return rec, errors.New(msg)
+	}
+	rec = records[0]
+	return rec, nil
+}
+
+// helper function to parse given markdown file and return HTML content
+func mdToHTML(fname string) (string, error) {
+	file, err := os.Open(fname)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	var md []byte
+	md, err = io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	// create markdown parser with extensions
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
+	p := parser.NewWithExtensions(extensions)
+	doc := p.Parse(md)
+
+	// create HTML renderer with extensions
+	htmlFlags := mhtml.CommonFlags | mhtml.HrefTargetBlank
+	opts := mhtml.RendererOptions{Flags: htmlFlags}
+	renderer := mhtml.NewRenderer(opts)
+	content := markdown.Render(doc, renderer)
+	//     return html.EscapeString(string(content)), nil
+	return string(content), nil
 }

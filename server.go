@@ -3,19 +3,17 @@ package main
 import (
 	"crypto/tls"
 	"embed"
-	"encoding/base64"
 	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/uptrace/bunrouter"
 )
+
+// metadata represents MetaData instance
+var metadata *MetaData
 
 // content is our static web server content.
 //go:embed static
@@ -95,94 +93,14 @@ func bunRouter() *bunrouter.CompatRouter {
 	return router
 }
 
-// Serve a reverse proxy for a given url
-func reverseProxy(targetURL string, w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-
-	// parse the url
-	url, _ := url.Parse(targetURL)
-
-	// create the reverse proxy
-	proxy := httputil.NewSingleHostReverseProxy(url)
-
-	// set custom transport to capture size of response body
-	//     proxy.Transport = &transport{http.DefaultTransport}
-	if Config.Verbose > 2 {
-		log.Printf("HTTP headers: %+v\n", r.Header)
-	}
-
-	// handle double slashes in request path
-	r.URL.Path = strings.Replace(r.URL.Path, "//", "/", -1)
-
-	// Update the headers to allow for SSL redirection
-	r.URL.Host = url.Host
-	r.URL.Scheme = url.Scheme
-	r.URL.User = url.User
-	if Config.Verbose > 0 {
-		log.Printf("redirect to url.Scheme=%s url.User=%s url.Host=%s", r.URL.Scheme, r.URL.User, r.URL.Host)
-	}
-	if url.User != nil {
-		// set basic authorization for provided user credentials
-		hash := base64.StdEncoding.EncodeToString([]byte(url.User.String()))
-		r.Header.Set("Authorization", fmt.Sprintf("Basic %s", hash))
-	}
-	reqHost := r.Header.Get("Host")
-	if reqHost == "" {
-		name, err := os.Hostname()
-		if err == nil {
-			reqHost = name
-		}
-	}
-
-	// XForward headers
-	if Config.XForwardedHost != "" {
-		r.Header.Set("X-Forwarded-Host", Config.XForwardedHost)
-	} else {
-		r.Header.Set("X-Forwarded-Host", reqHost)
-	}
-	r.Header.Set("X-Forwarded-For", r.RemoteAddr)
-	r.Host = url.Host
-	if Config.Verbose > 0 {
-		log.Printf("proxy request: %+v\n", r)
-	}
-
-	// use custom modify response function to setup response headers
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		if Config.Verbose > 0 {
-			log.Println("proxy ModifyResponse")
-		}
-		if Config.XContentTypeOptions != "" {
-			resp.Header.Set("X-Content-Type-Options", Config.XContentTypeOptions)
-		}
-		resp.Header.Set("Response-Status", resp.Status)
-		resp.Header.Set("Response-Status-Code", fmt.Sprintf("%d", resp.StatusCode))
-		resp.Header.Set("Response-Proto", resp.Proto)
-		resp.Header.Set("Response-Time", time.Since(start).String())
-		resp.Header.Set("Response-Time-Seconds", fmt.Sprintf("%v", time.Since(start).Seconds()))
-		return nil
-	}
-	proxy.ErrorHandler = func(rw http.ResponseWriter, r *http.Request, err error) {
-		if Config.Verbose > 0 {
-			log.Printf("proxy ErrorHandler error was: %+v", err)
-		}
-		header := rw.Header()
-		header.Set("Response-Status", fmt.Sprintf("%d", http.StatusBadGateway))
-		header.Set("Response-Status-Code", fmt.Sprintf("%d", http.StatusBadGateway))
-		header.Set("Response-Time", time.Since(start).String())
-		header.Set("Response-Time-Seconds", fmt.Sprintf("%v", time.Since(start).Seconds()))
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
-	}
-
-	// ServeHttp is non blocking and uses a go routine under the hood
-	proxy.ServeHTTP(w, r)
-}
-
 // Server implements MLaaS server
 func Server() {
 
 	// initialize server middleware
 	initLimiter(Config.LimiterPeriod)
+
+	// initialize metadata
+	metadata = &MetaData{DBName: Config.DBName, DBColl: Config.DBColl}
 
 	// setup server router
 	router := bunRouter()

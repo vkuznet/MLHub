@@ -8,31 +8,11 @@ package main
 //              https://gist.github.com/border/3489566
 
 import (
-	"encoding/json"
 	"log"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
-
-// Record define ML mongo record
-type Record struct {
-	MetaData    map[string]interface{} `json:"meta_data"`   // meta-data information about ML model
-	Model       string                 `json:"model"`       // model name
-	Type        string                 `json:"type"`        // model type
-	Version     string                 `json:"version"`     // ML version
-	Description string                 `json:"description"` // ML model description
-	Reference   string                 `json:"reference"`   // ML reference URL
-	Discipline  string                 `json:"discipline"`  // ML discipline
-	Bundle      string                 `json:"bundle"`      // ML bundle file
-}
-
-// ToJSON provides string representation of Record
-func (r Record) ToJSON() string {
-	// create pretty JSON representation of the record
-	data, _ := json.MarshalIndent(r, "", "    ")
-	return string(data)
-}
 
 // MongoConnection defines connection to MongoDB
 type MongoConnection struct {
