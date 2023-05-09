@@ -406,6 +406,41 @@ func addRecord(r *http.Request, update bool) error {
 	return errors.New(msg)
 }
 
+// LoginHandler handles login page
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub login")
+	//     host := fmt.Sprintf("%s?client_id=%s&redirect_uri=http://localhost:%d%s/oauth/redirect", Config.OAuthHost, Config.ClientID, Config.Port, Config.Base)
+	host := fmt.Sprintf("%s/github/login", Config.Base)
+	if Config.Verbose > 0 {
+		log.Println("OAuth host", host)
+	}
+	tmpl["OAuthHost"] = host
+	tmpl["Template"] = "login.tmpl"
+	httpResponse(w, r, tmpl)
+}
+
+// AccessHandler handles login page
+func AccessHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub access")
+	err := r.ParseForm()
+	if err != nil {
+		tmpl["Error"] = err
+		tmpl["HttpCode"] = http.StatusBadRequest
+		httpResponse(w, r, tmpl)
+		return
+	}
+	code := r.FormValue("code")
+	log.Println("### code", code)
+	token := "some token parsing"
+
+	// Finally, send a response to redirect the user to the "welcome" page
+	// with the access token
+	tmpl["Content"] = fmt.Sprintf("access token: %s", token)
+	tmpl["Template"] = "success.tmpl"
+	w.WriteHeader(http.StatusFound)
+	httpResponse(w, r, tmpl)
+}
+
 // PostHandler handles POST HTTP requests,
 // this request will create and upload ML models to backend server(s)
 func PostHandler(w http.ResponseWriter, r *http.Request) {
