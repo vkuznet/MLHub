@@ -10,6 +10,12 @@ import (
 	"strings"
 
 	"github.com/uptrace/bunrouter"
+
+	gologin "github.com/dghubble/gologin/v2"
+	"github.com/dghubble/gologin/v2/github"
+	sessions "github.com/dghubble/sessions"
+	"golang.org/x/oauth2"
+	githubOAuth2 "golang.org/x/oauth2/github"
 )
 
 // metadata represents MetaData instance
@@ -18,6 +24,43 @@ var metadata *MetaData
 // content is our static web server content.
 //go:embed static
 var StaticFs embed.FS
+
+// The OAuth parts are based on
+// https://github.com/dghubble/gologin
+// package where we explid github authentication, see
+// https://github.com/dghubble/gologin/blob/main/examples/github
+
+// sessionStore encodes and decodes session data stored in signed cookies
+var sessionStore = sessions.NewCookieStore[any](sessions.DebugCookieConfig, []byte(sessionSecret), nil)
+
+const (
+	sessionName     = "example-github-app"
+	sessionSecret   = "example cookie signing secret"
+	sessionUserKey  = "githubID"
+	sessionUsername = "githubUsername"
+)
+
+// issueSession issues a cookie session after successful Github login
+func issueSession() http.Handler {
+	fn := func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		githubUser, err := github.UserFromContext(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// 2. Implement a success handler to issue some form of session
+		session := sessionStore.New(sessionName)
+		session.Set(sessionUserKey, *githubUser.ID)
+		session.Set(sessionUsername, *githubUser.Login)
+		if err := session.Save(w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, req, "/profile", http.StatusFound)
+	}
+	return http.HandlerFunc(fn)
+}
 
 // helper function to get base path
 func basePath(s string) string {
@@ -65,6 +108,22 @@ func bunRouter() *bunrouter.CompatRouter {
 	router.POST(base+"/predict", PredictHandler)
 	router.POST(base+"/download", DownloadHandler)
 
+	// auth end-points
+	config := &oauth2.Config{
+		ClientID:     Config.ClientID,
+		ClientSecret: Config.ClientSecret,
+		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/oauth/redirect", Config.Port, Config.Base),
+		Endpoint:     githubOAuth2.Endpoint,
+	}
+	stateConfig := gologin.DebugOnlyCookieConfig
+	fl := github.StateHandler(stateConfig, github.LoginHandler(config, nil))
+	fc := github.StateHandler(stateConfig, github.CallbackHandler(config, issueSession(), nil))
+	// fl, fc are type of http.Handler and we need to use HTTP router
+	router.Router.GET(base+"/github/login", bunrouter.HTTPHandler(fl))
+	router.Router.GET(base+"/github/callback", bunrouter.HTTPHandler(fc))
+	router.GET(base+"/login", LoginHandler)
+	router.GET(base+"/oauth/redirect", AccessHandler)
+
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
 		filesFS, err := fs.Sub(StaticFs, "static/"+dir)
@@ -75,14 +134,6 @@ func bunRouter() *bunrouter.CompatRouter {
 		fileServer := http.FileServer(http.FS(filesFS))
 		hdlr := http.StripPrefix(m, fileServer)
 		router.Router.GET(m+"/*path", bunrouter.HTTPHandler(hdlr))
-
-		/*
-			m := fmt.Sprintf("%s/%s", Config.Base, dir)
-			d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
-			hdlr := http.StripPrefix(m, http.FileServer(http.Dir(d)))
-			// invoke bunrouter from Compat to setup static content
-			router.Router.GET(m+"/*path", bunrouter.HTTPHandler(hdlr))
-		*/
 	}
 
 	// static model download area
