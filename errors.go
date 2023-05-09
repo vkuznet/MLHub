@@ -11,6 +11,7 @@ const (
 	MetaDataError                    // 105 generic Meta data error
 	FileIOError                      // 106 file IO error
 	InsertError                      // 107 insert error
+	SessionError                     // 108 session error
 )
 
 // helper function to return human error message for given MLHub error code
@@ -31,6 +32,8 @@ func errorMessage(code int) string {
 		return "file IO error"
 	} else if code == 107 {
 		return "Insert error"
+	} else if code == 108 {
+		return "Session error"
 	} else {
 		return fmt.Sprintf("Not Implemented error for code %d", code)
 	}
