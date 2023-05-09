@@ -14,8 +14,12 @@ require (
 require (
 	cloud.google.com/go/compute v1.14.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+	github.com/dghubble/go-twitter v0.0.0-20221104224141-912508c3888b // indirect
 	github.com/dghubble/gologin/v2 v2.4.0 // indirect
+	github.com/dghubble/oauth1 v0.7.2 // indirect
 	github.com/dghubble/sessions v0.4.0 // indirect
+	github.com/dghubble/sling v1.4.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-github/v48 v48.2.0 // indirect

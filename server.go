@@ -17,6 +17,9 @@ import (
 	githubOAuth2 "golang.org/x/oauth2/github"
 
 	google "github.com/dghubble/gologin/v2/google"
+	twitter "github.com/dghubble/gologin/v2/twitter"
+	oauth1 "github.com/dghubble/oauth1"
+	twitterOAuth1 "github.com/dghubble/oauth1/twitter"
 	googleOAuth2 "golang.org/x/oauth2/google"
 )
 
@@ -79,6 +82,7 @@ func bunRouter() *bunrouter.CompatRouter {
 	router.POST(base+"/download", DownloadHandler)
 
 	// auth end-points
+	// github OAuth routes
 	config := &oauth2.Config{
 		ClientID:     Config.ClientID,
 		ClientSecret: Config.ClientSecret,
@@ -87,10 +91,11 @@ func bunRouter() *bunrouter.CompatRouter {
 	}
 	stateConfig := gologin.DebugOnlyCookieConfig
 	githubLogin := github.StateHandler(stateConfig, github.LoginHandler(config, nil))
-	githubCallback := github.StateHandler(stateConfig, github.CallbackHandler(config, githubSession(), nil))
+	githubCallback := github.StateHandler(stateConfig, github.CallbackHandler(config, issueSession("github"), nil))
 	router.Router.GET(base+"/github/login", bunrouter.HTTPHandler(githubLogin))
 	router.Router.GET(base+"/github/callback", bunrouter.HTTPHandler(githubCallback))
 
+	// google OAuth routes
 	config = &oauth2.Config{
 		ClientID:     Config.ClientID,
 		ClientSecret: Config.ClientSecret,
@@ -99,13 +104,24 @@ func bunRouter() *bunrouter.CompatRouter {
 		Scopes:       []string{"profile", "email"},
 	}
 	googleLogin := google.StateHandler(stateConfig, google.LoginHandler(config, nil))
-	googleCallback := google.StateHandler(stateConfig, google.CallbackHandler(config, googleSession(), nil))
+	googleCallback := google.StateHandler(stateConfig, google.CallbackHandler(config, issueSession("google"), nil))
 	router.Router.GET(base+"/google/login", bunrouter.HTTPHandler(googleLogin))
 	router.Router.GET(base+"/google/callback", bunrouter.HTTPHandler(googleCallback))
 
+	// twitter OAuth routes
+	config1 := &oauth1.Config{
+		ConsumerKey:    Config.ClientID,
+		ConsumerSecret: Config.ClientSecret,
+		CallbackURL:    fmt.Sprintf("http://localhost:%d%s/twitter/callback", Config.Port, Config.Base),
+		Endpoint:       twitterOAuth1.AuthorizeEndpoint,
+	}
+	twitterLogin := twitter.LoginHandler(config1, nil)
+	twitterCallback := twitter.CallbackHandler(config1, issueSession("twitter"), nil)
+	router.Router.GET(base+"/twitter/login", bunrouter.HTTPHandler(twitterLogin))
+	router.Router.GET(base+"/twitter/callback", bunrouter.HTTPHandler(twitterCallback))
+
 	router.GET(base+"/login", LoginHandler)
 	router.GET(base+"/access", AccessHandler)
-	//     router.GET(base+"/oauth/redirect", AccessHandler)
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {

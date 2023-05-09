@@ -7,6 +7,7 @@ import (
 	"github.com/dghubble/gologin/v2/github"
 	google "github.com/dghubble/gologin/v2/google"
 	oauth2Login "github.com/dghubble/gologin/v2/oauth2"
+	twitter "github.com/dghubble/gologin/v2/twitter"
 	sessions "github.com/dghubble/sessions"
 )
 
@@ -21,24 +22,38 @@ const (
 	sessionToken    = "token"
 )
 
-// githubSession issues a cookie session after successful Github login
-func githubSession() http.Handler {
+// issueSession issues a cookie session after successful Github login
+func issueSession(provider string) http.Handler {
 	fn := func(w http.ResponseWriter, req *http.Request) {
-		ctx := req.Context()
-		token, _ := oauth2Login.TokenFromContext(ctx)
-		user, err := github.UserFromContext(ctx)
-		if Config.Verbose > 0 {
-			log.Printf("githubSession\nTOKEN: %+v\nUSER: %+v", token, user)
-		}
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// 2. Implement a success handler to issue some form of session
 		session := sessionStore.New(sessionName)
-		session.Set(sessionUserKey, *user.ID)
-		session.Set(sessionUsername, *user.Login)
-		session.Set(sessionToken, token.AccessToken)
+		ctx := req.Context()
+		if token, err := oauth2Login.TokenFromContext(ctx); err == nil {
+			session.Set(sessionToken, token.AccessToken)
+		} else {
+			log.Println("ERROR: fail to obtain OAuth2 token", err)
+		}
+		if provider == "github" {
+			if user, err := github.UserFromContext(ctx); err == nil {
+				session.Set(sessionUserKey, *user.ID)
+				session.Set(sessionUsername, *user.Login)
+			} else {
+				log.Println("ERROR: fail to obtain github credentials", err)
+			}
+		} else if provider == "google" {
+			if user, err := google.UserFromContext(ctx); err == nil {
+				session.Set(sessionUserKey, user.Id)
+				session.Set(sessionUsername, user.Name)
+			} else {
+				log.Println("ERROR: fail to obtain google credentials", err)
+			}
+		} else if provider == "twitter" {
+			if user, err := twitter.UserFromContext(ctx); err == nil {
+				session.Set(sessionUserKey, user.ID)
+				session.Set(sessionUsername, user.ScreenName)
+			} else {
+				log.Println("ERROR: fail to obtain twitter credentials", err)
+			}
+		}
 		if err := session.Save(w); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
