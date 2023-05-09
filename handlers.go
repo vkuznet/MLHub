@@ -539,15 +539,13 @@ func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	// get our session cookies
 	session, err := sessionStore.Get(r, sessionName)
 	if err != nil {
-		tmpl["Error"] = err
-		tmpl["HttpCode"] = http.StatusBadRequest
-		httpResponse(w, r, tmpl)
+		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
 		return
 	}
 	// check if ser has been authenticated with any OAuth providers
 	user, ok := session.GetOk(sessionUsername)
 	if !ok {
-		http.Redirect(w, r, "/login", http.StatusUnauthorized)
+		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
 		return
 	}
 	tmpl["User"] = user
@@ -555,7 +553,12 @@ func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	fname := fmt.Sprintf("%s/md/inference.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
 	if err != nil {
-		httpError(w, r, tmpl, FileIOError, err, http.StatusInternalServerError)
+		tmpl["Content"] = err.Error()
+		tmpl["Code"] = FileIOError
+		tmpl["Template"] = "error.tmpl"
+		tmpl["HttpCode"] = http.StatusInternalServerError
+		log.Println("ERROR: InferenceHandler mdToHTML error", err)
+		httpResponse(w, r, tmpl)
 		return
 	}
 
