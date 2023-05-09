@@ -13,9 +13,11 @@ import (
 
 	gologin "github.com/dghubble/gologin/v2"
 	"github.com/dghubble/gologin/v2/github"
-	sessions "github.com/dghubble/sessions"
 	"golang.org/x/oauth2"
 	githubOAuth2 "golang.org/x/oauth2/github"
+
+	google "github.com/dghubble/gologin/v2/google"
+	googleOAuth2 "golang.org/x/oauth2/google"
 )
 
 // metadata represents MetaData instance
@@ -29,38 +31,6 @@ var StaticFs embed.FS
 // https://github.com/dghubble/gologin
 // package where we explid github authentication, see
 // https://github.com/dghubble/gologin/blob/main/examples/github
-
-// sessionStore encodes and decodes session data stored in signed cookies
-var sessionStore = sessions.NewCookieStore[any](sessions.DebugCookieConfig, []byte(sessionSecret), nil)
-
-const (
-	sessionName     = "example-github-app"
-	sessionSecret   = "example cookie signing secret"
-	sessionUserKey  = "githubID"
-	sessionUsername = "githubUsername"
-)
-
-// issueSession issues a cookie session after successful Github login
-func issueSession() http.Handler {
-	fn := func(w http.ResponseWriter, req *http.Request) {
-		ctx := req.Context()
-		githubUser, err := github.UserFromContext(ctx)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// 2. Implement a success handler to issue some form of session
-		session := sessionStore.New(sessionName)
-		session.Set(sessionUserKey, *githubUser.ID)
-		session.Set(sessionUsername, *githubUser.Login)
-		if err := session.Save(w); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, req, "/profile", http.StatusFound)
-	}
-	return http.HandlerFunc(fn)
-}
 
 // helper function to get base path
 func basePath(s string) string {
@@ -112,17 +82,30 @@ func bunRouter() *bunrouter.CompatRouter {
 	config := &oauth2.Config{
 		ClientID:     Config.ClientID,
 		ClientSecret: Config.ClientSecret,
-		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/oauth/redirect", Config.Port, Config.Base),
+		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/github/callback", Config.Port, Config.Base),
 		Endpoint:     githubOAuth2.Endpoint,
 	}
 	stateConfig := gologin.DebugOnlyCookieConfig
-	fl := github.StateHandler(stateConfig, github.LoginHandler(config, nil))
-	fc := github.StateHandler(stateConfig, github.CallbackHandler(config, issueSession(), nil))
-	// fl, fc are type of http.Handler and we need to use HTTP router
-	router.Router.GET(base+"/github/login", bunrouter.HTTPHandler(fl))
-	router.Router.GET(base+"/github/callback", bunrouter.HTTPHandler(fc))
+	githubLogin := github.StateHandler(stateConfig, github.LoginHandler(config, nil))
+	githubCallback := github.StateHandler(stateConfig, github.CallbackHandler(config, githubSession(), nil))
+	router.Router.GET(base+"/github/login", bunrouter.HTTPHandler(githubLogin))
+	router.Router.GET(base+"/github/callback", bunrouter.HTTPHandler(githubCallback))
+
+	config = &oauth2.Config{
+		ClientID:     Config.ClientID,
+		ClientSecret: Config.ClientSecret,
+		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/google/callback", Config.Port, Config.Base),
+		Endpoint:     googleOAuth2.Endpoint,
+		Scopes:       []string{"profile", "email"},
+	}
+	googleLogin := google.StateHandler(stateConfig, google.LoginHandler(config, nil))
+	googleCallback := google.StateHandler(stateConfig, google.CallbackHandler(config, googleSession(), nil))
+	router.Router.GET(base+"/google/login", bunrouter.HTTPHandler(googleLogin))
+	router.Router.GET(base+"/google/callback", bunrouter.HTTPHandler(googleCallback))
+
 	router.GET(base+"/login", LoginHandler)
-	router.GET(base+"/oauth/redirect", AccessHandler)
+	router.GET(base+"/access", AccessHandler)
+	//     router.GET(base+"/oauth/redirect", AccessHandler)
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
