@@ -22,6 +22,11 @@ type Configuration struct {
 	Verbose   int    `json:"verbose"`    // verbose output
 	StaticDir string `json:"static_dir"` // speficy static dir location
 
+	// OAuth parts
+	OAuthHost    string `json:"oauth_host"`    // OAuthHost name
+	ClientID     string `json:"client_id"`     // client id
+	ClientSecret string `json:"client_secret"` // client secret
+
 	// proxy parts
 	XForwardedHost      string `json:"X-Forwarded-Host"`       // X-Forwarded-Host field of HTTP request
 	XContentTypeOptions string `json:"X-Content-Type-Options"` // X-Content-Type-Options option
