@@ -78,6 +78,8 @@ func httpResponse(w http.ResponseWriter, r *http.Request, tmpl TmplRecord) {
 	elapsedTime := tmpl.GetElapsedTime()
 	tmpl["ElapsedTime"] = elapsedTime
 	if r.Header.Get("Accept") != "application/json" {
+		// regenerate top part since we may
+		tmpl["Top"] = tmplPage("top.tmpl", tmpl)
 		top := tmpl.GetString("Top")
 		bottom := tmpl.GetString("Bottom")
 		tfile := tmpl.GetString("Template")
@@ -136,6 +138,7 @@ func httpError(w http.ResponseWriter, r *http.Request, tmpl TmplRecord, code int
 func makeTmpl(title string) TmplRecord {
 	tmpl := make(TmplRecord)
 	tmpl["Title"] = title
+	tmpl["User"] = ""
 	tmpl["Base"] = Config.Base
 	tmpl["ServerInfo"] = info()
 	tmpl["Top"] = tmplPage("top.tmpl", tmpl)
@@ -409,12 +412,10 @@ func addRecord(r *http.Request, update bool) error {
 // LoginHandler handles login page
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub login")
-	//     host := fmt.Sprintf("%s?client_id=%s&redirect_uri=http://localhost:%d%s/oauth/redirect", Config.OAuthHost, Config.ClientID, Config.Port, Config.Base)
-	host := fmt.Sprintf("%s/github/login", Config.Base)
-	if Config.Verbose > 0 {
-		log.Println("OAuth host", host)
-	}
-	tmpl["OAuthHost"] = host
+	tmpl["GithubLogin"] = fmt.Sprintf("%s/github/login", Config.Base)
+	tmpl["GoogleLogin"] = fmt.Sprintf("%s/google/login", Config.Base)
+	tmpl["FacebookLogin"] = fmt.Sprintf("%s/facebook/login", Config.Base)
+	tmpl["TwitterLogin"] = fmt.Sprintf("%s/twitter/login", Config.Base)
 	tmpl["Template"] = "login.tmpl"
 	httpResponse(w, r, tmpl)
 }
@@ -422,20 +423,38 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // AccessHandler handles login page
 func AccessHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub access")
-	err := r.ParseForm()
+
+	// get our session cookies
+	session, err := sessionStore.Get(r, sessionName)
 	if err != nil {
 		tmpl["Error"] = err
 		tmpl["HttpCode"] = http.StatusBadRequest
 		httpResponse(w, r, tmpl)
 		return
 	}
-	code := r.FormValue("code")
-	log.Println("### code", code)
-	token := "some token parsing"
 
-	// Finally, send a response to redirect the user to the "welcome" page
-	// with the access token
-	tmpl["Content"] = fmt.Sprintf("access token: %s", token)
+	// extract user context from OAuth
+	user, ok := session.GetOk(sessionUsername)
+	if !ok {
+		tmpl["Error"] = "User session does not present user name"
+		tmpl["HttpCode"] = http.StatusBadRequest
+		httpResponse(w, r, tmpl)
+		return
+	}
+	token, ok := session.GetOk(sessionToken)
+	if !ok {
+		tmpl["Error"] = "User session does not present access token"
+		tmpl["HttpCode"] = http.StatusBadRequest
+		httpResponse(w, r, tmpl)
+		return
+	}
+	if Config.Verbose > 0 {
+		log.Printf("AccessHandler: user %s token %s", user, token)
+	}
+
+	// HTTP response with user info
+	content := fmt.Sprintf("User %s, access token: %s", user, token)
+	tmpl["Content"] = template.HTML(content)
 	tmpl["Template"] = "success.tmpl"
 	w.WriteHeader(http.StatusFound)
 	httpResponse(w, r, tmpl)
@@ -517,6 +536,22 @@ func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 // InferenceHandler handles status of MLHub server
 func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub inference")
+	// get our session cookies
+	session, err := sessionStore.Get(r, sessionName)
+	if err != nil {
+		tmpl["Error"] = err
+		tmpl["HttpCode"] = http.StatusBadRequest
+		httpResponse(w, r, tmpl)
+		return
+	}
+	// check if ser has been authenticated with any OAuth providers
+	user, ok := session.GetOk(sessionUsername)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusUnauthorized)
+		return
+	}
+	tmpl["User"] = user
+	// proceed with inference layer
 	fname := fmt.Sprintf("%s/md/inference.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
 	if err != nil {
