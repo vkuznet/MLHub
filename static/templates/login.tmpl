@@ -1,18 +1,23 @@
 <div class="ml-center">
-    <h1>OAuth authentication</h1>
-    <a href="{{.OAuthHost}}">
+    <div>
+        To proceed with inference request please authenticate yourself with
+        any of the following
+        <a href="https://www.wikiwand.com/en/OAuth">OAuth</a> providers:
+    </div>
+    <br/>
+    <a href="{{.GithubLogin}}">
       <img src="{{.Base}}/images/github_login.png" alt="GitHub login" class="width-200">
     </a>
     <br/>
-    <a href="{{.OAuthHost}}">
+    <a href="{{.GoogleLogin}}">
       <img src="{{.Base}}/images/google_login.png" alt="Google login" class="width-200">
     </a>
     <br/>
-    <a href="{{.OAuthHost}}">
+    <a href="{{.FacebookLogin}}">
       <img src="{{.Base}}/images/facebook_login.png" alt="Facebook login" class="width-200">
     </a>
     <br/>
-    <a href="{{.OAuthHost}}">
+    <a href="{{.TwitterLogin}}">
       <img src="{{.Base}}/images/twitter_login.png" alt="Twitter login" class="width-200">
     </a>
 </div>

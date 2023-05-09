@@ -10,7 +10,11 @@
 <body>
 
 <header>
+{{if eq .User ""}}
     <h1 class="white">{{.Title}}</h1>
+{{else}}
+    <h1 class="white">{{.Title}} ({{.User}})</h1>
+{{end}}
     <br/>
     <div class="white">
         <a href="{{.Base}}/" class="button button-light-outline button-small button-round">Home</a>
