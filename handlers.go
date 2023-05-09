@@ -539,12 +539,14 @@ func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	// get our session cookies
 	session, err := sessionStore.Get(r, sessionName)
 	if err != nil {
+		log.Printf("InferenceHandler, session %s redirect due to error %v", sessionName, err)
 		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
 		return
 	}
 	// check if ser has been authenticated with any OAuth providers
 	user, ok := session.GetOk(sessionUsername)
 	if !ok {
+		log.Printf("InferenceHandler, unable to identify username due to error %v", err)
 		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
 		return
 	}
