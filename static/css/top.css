@@ -38,6 +38,16 @@ section:after {
 }
 
 /* Style the footer */
+.ml-center {
+  padding-top: 10px;
+  padding-left: 20px;
+  text-align: center;
+  background-color: #f1f1f1;
+  width:100%;
+  min-height: 600px;
+}
+
+/* Style the footer */
 footer {
   background-color: gray;
   padding: 10px;
