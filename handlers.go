@@ -190,6 +190,21 @@ func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 // PredictHandler handles GET HTTP requests
 func PredictHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub predict")
+
+	// user HTTP call should present either valid token while using CLI
+	// for web calls this handler will be called from InferenceHandler one
+	// which will perform user authorization
+	if r.Header.Get("Accept") == "application/json" {
+		if err := checkAuthz(tmpl, w, r); err != nil {
+			tmpl["Content"] = fmt.Sprintf("Invalid or missing token, error: %v", err)
+			tmpl["Code"] = SessionError
+			tmpl["Template"] = "error.tmpl"
+			tmpl["HttpCode"] = http.StatusBadRequest
+			httpResponse(w, r, tmpl)
+			return
+		}
+	}
+
 	rec, err := modelRecord(r)
 	if err != nil {
 		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
@@ -272,27 +287,69 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, downloadURL, http.StatusSeeOther)
 }
 
+// helper function to check user's authorization
+func checkAuthz(tmpl TmplRecord, w http.ResponseWriter, r *http.Request) error {
+	authz := r.Header.Get("Authorization")
+	// get our session cookies
+	session, err := sessionStore.Get(r, sessionName)
+	if authz != "" || err != nil {
+		token := strings.Trim(strings.Replace(authz, "Bearer ", "", -1), " ")
+		session, err = tokenInfo(token, w, r)
+		if err != nil {
+			return err
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	// extract user context from OAuth
+	user, ok := session.GetOk(sessionUserName)
+	if !ok {
+		return errors.New("User session does not present user name")
+	}
+	token, ok := session.GetOk(sessionToken)
+	if !ok {
+		return errors.New("User session does not present access token")
+	}
+	provider, ok := session.GetOk(sessionProvider)
+	if !ok {
+		return errors.New("User session does not present access token")
+	}
+	tmpl["User"] = user
+	tmpl["Token"] = token
+	tmpl["Provider"] = provider
+	return nil
+}
+
 // UploadHandler handles upload action of ML model to back-end server
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub upload")
+	var err error
 
-	// get our session cookies
-	session, err := sessionStore.Get(r, sessionName)
-	if err != nil {
-		log.Printf("UploadHandler, session %s redirect due to error %v", sessionName, err)
-		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
-		return
+	// user HTTP call should present either valid token or it will be
+	// redirected to /login end-point
+	if err = checkAuthz(tmpl, w, r); err != nil {
+		// get our session cookies
+		session, err := sessionStore.Get(r, sessionName)
+		if err != nil {
+			log.Printf("UploadHandler, session %s redirect due to error %v", sessionName, err)
+			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			return
+		}
+		// check if ser has been authenticated with any OAuth providers
+		user, ok := session.GetOk(sessionUserName)
+		if !ok {
+			log.Printf("UploadHandler, unable to identify username due to error %v", err)
+			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			return
+		}
+		userID, _ := session.GetOk(sessionUserID)
+		provider, _ := session.GetOk(sessionProvider)
+		tmpl["User"] = user.(string)
+		tmpl["UserID"] = userID.(string)
+		tmpl["Provider"] = provider.(string)
 	}
-	// check if ser has been authenticated with any OAuth providers
-	user, ok := session.GetOk(sessionUserName)
-	if !ok {
-		log.Printf("UploadHandler, unable to identify username due to error %v", err)
-		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
-		return
-	}
-	userID, _ := session.GetOk(sessionUserID)
-	provider, _ := session.GetOk(sessionProvider)
-	tmpl["User"] = user
 
 	// handle web GET request to upload page
 	if r.Method == "GET" {
@@ -353,9 +410,9 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// assign oauth attributes to the record
-	rec.UserName = user.(string)
-	rec.UserID = userID.(string)
-	rec.Provider = provider.(string)
+	rec.UserName = tmpl.GetString("User")
+	rec.UserID = tmpl.GetString("UserID")
+	rec.Provider = tmpl.GetString("Provider")
 
 	// perform upload action
 	err = Upload(rec, r)
@@ -445,30 +502,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 func AccessHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub access")
 
-	// get our session cookies
-	session, err := sessionStore.Get(r, sessionName)
-	if err != nil {
+	// user HTTP call should present either valid token or it will be
+	// redirected to /login end-point
+	if err := checkAuthz(tmpl, w, r); err != nil {
 		tmpl["Error"] = err
 		tmpl["HttpCode"] = http.StatusBadRequest
 		httpResponse(w, r, tmpl)
 		return
 	}
-
-	// extract user context from OAuth
-	user, ok := session.GetOk(sessionUserName)
-	if !ok {
-		tmpl["Error"] = "User session does not present user name"
-		tmpl["HttpCode"] = http.StatusBadRequest
-		httpResponse(w, r, tmpl)
-		return
-	}
-	token, ok := session.GetOk(sessionToken)
-	if !ok {
-		tmpl["Error"] = "User session does not present access token"
-		tmpl["HttpCode"] = http.StatusBadRequest
-		httpResponse(w, r, tmpl)
-		return
-	}
+	user := tmpl.GetString("User")
+	token := tmpl.GetString("Token")
 	if Config.Verbose > 0 {
 		log.Printf("AccessHandler: user %s token %s", user, token)
 	}
@@ -477,7 +520,6 @@ func AccessHandler(w http.ResponseWriter, r *http.Request) {
 	content := fmt.Sprintf("User %s, access token: %s", user, token)
 	tmpl["Content"] = template.HTML(content)
 	tmpl["Template"] = "success.tmpl"
-	w.WriteHeader(http.StatusFound)
 	httpResponse(w, r, tmpl)
 }
 
@@ -557,21 +599,30 @@ func ModelsHandler(w http.ResponseWriter, r *http.Request) {
 // InferenceHandler handles status of MLHub server
 func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub inference")
-	// get our session cookies
-	session, err := sessionStore.Get(r, sessionName)
-	if err != nil {
-		log.Printf("InferenceHandler, session %s redirect due to error %v", sessionName, err)
-		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
-		return
+
+	// user HTTP call should present either valid token or it will be
+	// redirected to /login end-point
+	if err := checkAuthz(tmpl, w, r); err != nil {
+		// get our session cookies
+		session, err := sessionStore.Get(r, sessionName)
+		if err != nil {
+			log.Printf("InferenceHandler, session %s redirect due to error %v", sessionName, err)
+			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			return
+		}
+		// check if ser has been authenticated with any OAuth providers
+		user, ok := session.GetOk(sessionUserName)
+		if !ok {
+			log.Printf("InferenceHandler, unable to identify username due to error %v", err)
+			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			return
+		}
+		userID, _ := session.GetOk(sessionUserID)
+		provider, _ := session.GetOk(sessionProvider)
+		tmpl["User"] = user
+		tmpl["UserID"] = userID
+		tmpl["Provider"] = provider
 	}
-	// check if ser has been authenticated with any OAuth providers
-	user, ok := session.GetOk(sessionUserName)
-	if !ok {
-		log.Printf("InferenceHandler, unable to identify username due to error %v", err)
-		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
-		return
-	}
-	tmpl["User"] = user
 	// proceed with inference layer
 	fname := fmt.Sprintf("%s/md/inference.md", Config.StaticDir)
 	content, err := mdToHTML(fname)
