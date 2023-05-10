@@ -276,6 +276,24 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub upload")
 
+	// get our session cookies
+	session, err := sessionStore.Get(r, sessionName)
+	if err != nil {
+		log.Printf("UploadHandler, session %s redirect due to error %v", sessionName, err)
+		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+		return
+	}
+	// check if ser has been authenticated with any OAuth providers
+	user, ok := session.GetOk(sessionUserName)
+	if !ok {
+		log.Printf("UploadHandler, unable to identify username due to error %v", err)
+		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+		return
+	}
+	userID, _ := session.GetOk(sessionUserID)
+	provider, _ := session.GetOk(sessionProvider)
+	tmpl["User"] = user
+
 	// handle web GET request to upload page
 	if r.Method == "GET" {
 		tmpl["Template"] = "upload.tmpl"
@@ -291,7 +309,6 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// handle upload POST requests
 	var rec Record
-	var err error
 	if strings.Contains(r.URL.Path, "/model") {
 		// POST request to /model/:model/upload API
 		rec, err = modelRecord(r)
@@ -335,6 +352,10 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			Bundle:      bundle,
 		}
 	}
+	// assign oauth attributes to the record
+	rec.UserName = user.(string)
+	rec.UserID = userID.(string)
+	rec.Provider = provider.(string)
 
 	// perform upload action
 	err = Upload(rec, r)
@@ -434,7 +455,7 @@ func AccessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// extract user context from OAuth
-	user, ok := session.GetOk(sessionUsername)
+	user, ok := session.GetOk(sessionUserName)
 	if !ok {
 		tmpl["Error"] = "User session does not present user name"
 		tmpl["HttpCode"] = http.StatusBadRequest
@@ -544,7 +565,7 @@ func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// check if ser has been authenticated with any OAuth providers
-	user, ok := session.GetOk(sessionUsername)
+	user, ok := session.GetOk(sessionUserName)
 	if !ok {
 		log.Printf("InferenceHandler, unable to identify username due to error %v", err)
 		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
