@@ -13,10 +13,11 @@ import (
 
 const (
 	sessionName     = "MLHub-app"
-	sessionSecret   = "signing secret"
-	sessionUserKey  = "ID"
-	sessionUsername = "Username"
-	sessionToken    = "token"
+	sessionSecret   = ""
+	sessionUserID   = ""
+	sessionUserName = ""
+	sessionToken    = ""
+	sessionProvider = ""
 )
 
 // sessionStore encodes and decodes session data stored in signed cookies
@@ -33,24 +34,25 @@ func issueSession(provider string) http.Handler {
 		} else {
 			log.Println("ERROR: fail to obtain OAuth2 token", err)
 		}
+		session.Set(sessionProvider, provider)
 		if provider == "github" {
 			if user, err := github.UserFromContext(ctx); err == nil {
-				session.Set(sessionUserKey, *user.ID)
-				session.Set(sessionUsername, *user.Login)
+				session.Set(sessionUserID, *user.ID)
+				session.Set(sessionUserName, *user.Login)
 			} else {
 				log.Println("ERROR: fail to obtain github credentials", err)
 			}
 		} else if provider == "google" {
 			if user, err := google.UserFromContext(ctx); err == nil {
-				session.Set(sessionUserKey, user.Id)
-				session.Set(sessionUsername, user.Name)
+				session.Set(sessionUserID, user.Id)
+				session.Set(sessionUserName, user.Name)
 			} else {
 				log.Println("ERROR: fail to obtain google credentials", err)
 			}
 		} else if provider == "twitter" {
 			if user, err := twitter.UserFromContext(ctx); err == nil {
-				session.Set(sessionUserKey, user.ID)
-				session.Set(sessionUsername, user.ScreenName)
+				session.Set(sessionUserID, user.ID)
+				session.Set(sessionUserName, user.ScreenName)
 			} else {
 				log.Println("ERROR: fail to obtain twitter credentials", err)
 			}
