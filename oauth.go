@@ -13,12 +13,13 @@ import (
 )
 
 const (
-	sessionName     = "MLHub-app"
-	sessionSecret   = "secret"
-	sessionUserID   = "userID"
-	sessionUserName = "userName"
-	sessionToken    = "token"
-	sessionProvider = "provider"
+	// here we keep names of cookies in our OAuth session
+	sessionName     = "MLHub-App"
+	sessionSecret   = "MLHub-Secret"
+	sessionUserID   = "MLHub-UserID"
+	sessionUserName = "MLHub-UserName"
+	sessionToken    = "MLHub-Token"
+	sessionProvider = "MLHun-Provider"
 )
 
 // sessionStore encodes and decodes session data stored in signed cookies
