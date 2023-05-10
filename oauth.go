@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -13,11 +14,11 @@ import (
 
 const (
 	sessionName     = "MLHub-app"
-	sessionSecret   = ""
-	sessionUserID   = ""
-	sessionUserName = ""
-	sessionToken    = ""
-	sessionProvider = ""
+	sessionSecret   = "secret"
+	sessionUserID   = "userID"
+	sessionUserName = "userName"
+	sessionToken    = "token"
+	sessionProvider = "provider"
 )
 
 // sessionStore encodes and decodes session data stored in signed cookies
@@ -26,36 +27,42 @@ var sessionStore = sessions.NewCookieStore[any](sessions.DebugCookieConfig, []by
 // issueSession issues a cookie session after successful provider login
 func issueSession(provider string) http.Handler {
 	fn := func(w http.ResponseWriter, req *http.Request) {
+		var userName, userID, token string
 		session := sessionStore.New(sessionName)
 		ctx := req.Context()
-		log.Println("### issueSession", provider)
-		if token, err := oauth2Login.TokenFromContext(ctx); err == nil {
-			session.Set(sessionToken, token.AccessToken)
+		if t, err := oauth2Login.TokenFromContext(ctx); err == nil {
+			token = t.AccessToken
 		} else {
 			log.Println("ERROR: fail to obtain OAuth2 token", err)
 		}
-		session.Set(sessionProvider, provider)
 		if provider == "github" {
 			if user, err := github.UserFromContext(ctx); err == nil {
-				session.Set(sessionUserID, *user.ID)
-				session.Set(sessionUserName, *user.Login)
+				userID = fmt.Sprintf("%v", *user.ID)
+				userName = fmt.Sprintf("%v", *user.Login)
 			} else {
 				log.Println("ERROR: fail to obtain github credentials", err)
 			}
 		} else if provider == "google" {
 			if user, err := google.UserFromContext(ctx); err == nil {
-				session.Set(sessionUserID, user.Id)
-				session.Set(sessionUserName, user.Name)
+				userID = fmt.Sprintf("%v", user.Id)
+				userName = fmt.Sprintf("%v", user.Name)
 			} else {
 				log.Println("ERROR: fail to obtain google credentials", err)
 			}
 		} else if provider == "twitter" {
 			if user, err := twitter.UserFromContext(ctx); err == nil {
-				session.Set(sessionUserID, user.ID)
-				session.Set(sessionUserName, user.ScreenName)
+				userID = fmt.Sprintf("%v", user.ID)
+				userName = fmt.Sprintf("%v", user.ScreenName)
 			} else {
 				log.Println("ERROR: fail to obtain twitter credentials", err)
 			}
+		}
+		session.Set(sessionProvider, provider)
+		session.Set(sessionToken, token)
+		session.Set(sessionUserID, userID)
+		session.Set(sessionUserName, userName)
+		if Config.Verbose > 0 {
+			log.Printf("OAuth: provider %s user %s userID %s token %s", provider, userName, userID, token)
 		}
 		if err := session.Save(w); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
