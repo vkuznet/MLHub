@@ -16,6 +16,9 @@ type Record struct {
 	Reference   string                 `json:"reference"`   // ML reference URL
 	Discipline  string                 `json:"discipline"`  // ML discipline
 	Bundle      string                 `json:"bundle"`      // ML bundle file
+	UserName    string                 `json:"user_name"`   // user name
+	UserID      string                 `json:"user_id"`     // user id
+	Provider    string                 `json:"provider"`    // auth provider
 }
 
 // ToJSON provides string representation of Record
