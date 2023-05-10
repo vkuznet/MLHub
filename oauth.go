@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/dghubble/gologin/v2/github"
 	google "github.com/dghubble/gologin/v2/google"
@@ -72,4 +76,117 @@ func issueSession(provider string) http.Handler {
 		http.Redirect(w, req, "/access", http.StatusFound)
 	}
 	return http.HandlerFunc(fn)
+}
+
+/*
+To check github token we can use the following API call:
+curl -v -H "Authorization: Bearer $token" https://api.github.com/user
+it will return something like this:
+{
+  "login": "UserName",
+  "id": UserID,
+  "type": "User",
+  "name": "First Last name",
+  "company": "Company Name",
+  "location": "City, State",
+  "bio": "Title associated with user",
+}
+*/
+
+// UserData represents meta-data information about user
+type UserData struct {
+	Login    string
+	ID       int
+	Name     string
+	Company  string
+	Location string
+	Bio      string
+}
+
+// helper function to get user data info
+func githubTokenInfo(token string) (UserData, error) {
+	var userData UserData
+	// make HTTP call to github
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	uri := "https://api.github.com/user"
+	req, err := http.NewRequest("GET", uri, nil)
+	if err != nil {
+		return userData, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	rsp, err := client.Do(req)
+	if err != nil {
+		return userData, err
+	}
+	defer rsp.Body.Close()
+	data, err := io.ReadAll(rsp.Body)
+	if err != nil {
+		return userData, err
+	}
+	err = json.Unmarshal(data, &userData)
+	return userData, err
+}
+
+// helper function to get user data info
+func tokenInfo(token string, w http.ResponseWriter, r *http.Request) (*sessions.Session[any], error) {
+	var userData UserData
+	var err error
+	var provider string
+	providers := []string{"github", "google", "facebook", "twitter"}
+	for _, p := range providers {
+		if p == "github" {
+			userData, err = githubTokenInfo(token)
+		} else if p == "google" {
+			err = errors.New(fmt.Sprintf("tokenInfo for p %s is not yet implemented", p))
+		} else if p == "facebook" {
+			err = errors.New(fmt.Sprintf("tokenInfo for p %s is not yet implemented", p))
+		} else if p == "twitter" {
+			err = errors.New(fmt.Sprintf("tokenInfo for p %s is not yet implemented", p))
+		} else {
+			err = errors.New(fmt.Sprintf("tokenInfo for p %s is not yet implemented", p))
+		}
+		if err == nil {
+			provider = p
+			break
+		}
+	}
+	if token == "" {
+		return nil, errors.New("No valid access token is provided")
+	}
+	if err != nil {
+		msg := fmt.Sprintf("None of the existing providers %v can validate your token", providers)
+		return nil, errors.New(msg)
+	}
+	userData, err = githubTokenInfo(token)
+	if err != nil {
+		return nil, err
+	}
+	if userData.Login == "" || userData.ID == 0 {
+		return nil, errors.New("No valid user data is validated from" + provider)
+	}
+	// now if token is valid we will setup appropriate session cookies
+	session, err := sessionStore.Get(r, sessionName)
+	if err != nil {
+		if r.Header.Get("Accept") == "application/json" {
+			if Config.Verbose > 0 {
+				log.Println("### tokenInfo create new session for HTTP CLI", r.Header.Get("User-Agent"), sessionName)
+			}
+			session = sessionStore.New(sessionName)
+		} else {
+			return session, err
+		}
+	}
+	session.Set(sessionProvider, provider)
+	session.Set(sessionToken, token)
+	session.Set(sessionUserID, userData.ID)
+	session.Set(sessionUserName, userData.Login)
+	if err := session.Save(w); err != nil {
+		log.Println("### tokenInfo saession saved error", err)
+		return nil, err
+	}
+	log.Printf("### tokenInfo session is saved, %+v", session)
+	return session, nil
 }
