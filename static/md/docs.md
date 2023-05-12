@@ -1,6 +1,16 @@
 # MLHub documentation
-MLHub represents a hub for different MLaaS backends. It provides the following
-functionality:
+MLHub is a machine learning service for open science. It is a platform for storing and publishing trained ML models coupled with an inference engine that delivers insights on demand. MLHub democratizes access to machine learning resources for communities from all scientific domains.
+
+Using MLHub, researchers can easily:
+* Upload, organize, and manage privacy settings on their own trained models.
+* Publish thier models and assign DOIs with the click of a button.
+* Search for models published by other researchers and generate citations.
+* Run the inference engine to compute output predictions on any input dataset, using any model in the repository to which the researcher has access.
+
+MLHub is more than just a reference library of published science. It can be directly used in machine learning workflows as tool for research itself. So, by incorporating a public service like MLHub early in their research process, scientists simplify the eventual task of making their published research FAIR-compliant.
+
+## Architecture
+MLHub supports all common MLaaS backend frameworks, including TensorFlow, PyTorch, Keras, and scikit-learn. It consists of the following components:
 - MetaData service for pre-trained ML models
 - A reverse proxy to different MLaaS backends:
 ```
