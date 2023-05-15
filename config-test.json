@@ -1,0 +1,18 @@
+{
+    "base": "",
+    "verbose": 1,
+    "db_uri": "mongodb://localhost:8230",
+    "db_name": "ml",
+    "db_coll": "metadata",
+    "oauth_host": "https://github.com/login/oauth/authorize",
+    "client_id" : "client-id",
+    "client_secret": "client-secret",
+    "backends": {
+        "TensorFlow": {
+            "name": "TFaaS",
+            "type": "TensorFlow",
+            "uri": "http://localhost:8083"
+        }
+    },
+    "port": 8181
+}
