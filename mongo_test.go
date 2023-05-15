@@ -44,6 +44,6 @@ func TestMongoInsert(t *testing.T) {
 		t.Errorf("unable to find records using spec '%s', error %v", spec, err)
 	}
 	if len(records) != 1 {
-		t.Errorf("unable to find records using spec '%s', records %+v", spec, records)
+		t.Errorf("wrong number of records using spec '%s', records %+v", spec, records)
 	}
 }
