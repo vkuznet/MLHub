@@ -73,7 +73,20 @@ func issueSession(provider string) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, req, "/access", http.StatusFound)
+		// by default we will redirect to access end-point
+		rpath := "/access"
+		if req.URL != nil {
+			// but if we get redirect query parameter we'll use it
+			// to change redirect path
+			redirect := req.URL.Query().Get("redirect")
+			if redirect != "" {
+				rpath = redirect
+			}
+		}
+		if Config.Verbose > 0 {
+			log.Printf("session redirect to '%s', request %+v", rpath, req)
+		}
+		http.Redirect(w, req, rpath, http.StatusFound)
 	}
 	return http.HandlerFunc(fn)
 }
