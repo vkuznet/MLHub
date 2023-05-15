@@ -90,8 +90,13 @@ func bunRouter() *bunrouter.CompatRouter {
 		Endpoint:     githubOAuth2.Endpoint,
 	}
 	stateConfig := gologin.DebugOnlyCookieConfig
-	githubLogin := github.StateHandler(stateConfig, github.LoginHandler(config, nil))
-	githubCallback := github.StateHandler(stateConfig, github.CallbackHandler(config, issueSession("github"), nil))
+	//     githubLogin := github.StateHandler(stateConfig, github.LoginHandler(config, nil))
+	githubLogin := gologinHandler(config, github.StateHandler(stateConfig, github.LoginHandler(config, nil)))
+	//     githubCallback := github.StateHandler(stateConfig, github.CallbackHandler(config, issueSession("github"), nil))
+	githubCallback := gologinHandler(config, github.StateHandler(
+		stateConfig,
+		github.CallbackHandler(config, issueSession("github"), nil),
+	))
 	router.Router.GET(base+"/github/login", bunrouter.HTTPHandler(githubLogin))
 	router.Router.GET(base+"/github/callback", bunrouter.HTTPHandler(githubCallback))
 
