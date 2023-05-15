@@ -127,6 +127,7 @@ func bunRouter() *bunrouter.CompatRouter {
 
 	router.GET(base+"/login", LoginHandler)
 	router.GET(base+"/access", AccessHandler)
+	router.GET(base+"/token", TokenHandler)
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {

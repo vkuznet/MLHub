@@ -518,6 +518,47 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	httpResponse(w, r, tmpl)
 }
 
+// TokenHandler handles login page
+func TokenHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl := makeTmpl("MLHub token")
+
+	// user HTTP call should present either valid token or it will be
+	// redirected to /login end-point
+	if err := checkAuthz(tmpl, w, r); err != nil {
+		rpath := fmt.Sprintf("/login?redirect=%s", r.URL.Path)
+		// get our session cookies
+		session, err := sessionStore.Get(r, sessionName)
+		if err != nil {
+			log.Printf("TokenHandler, session %s redirect due to error %v", sessionName, err)
+			http.Redirect(w, r, rpath, http.StatusTemporaryRedirect)
+			return
+		}
+		// check if ser has been authenticated with any OAuth providers
+		user, ok := session.GetOk(sessionUserName)
+		if !ok {
+			log.Printf("TokenHandler, unable to identify username due to error %v", err)
+			http.Redirect(w, r, rpath, http.StatusTemporaryRedirect)
+			return
+		}
+		userID, _ := session.GetOk(sessionUserID)
+		provider, _ := session.GetOk(sessionProvider)
+		tmpl["User"] = user
+		tmpl["UserID"] = userID
+		tmpl["Provider"] = provider
+	}
+	user := tmpl.GetString("User")
+	token := tmpl.GetString("Token")
+	if Config.Verbose > 0 {
+		log.Printf("AccessHandler: user %s token %s", user, token)
+	}
+
+	// HTTP response with user info
+	content := fmt.Sprintf("User %s, access token: %s", user, token)
+	tmpl["Content"] = template.HTML(content)
+	tmpl["Template"] = "success.tmpl"
+	httpResponse(w, r, tmpl)
+}
+
 // AccessHandler handles login page
 func AccessHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := makeTmpl("MLHub access")
