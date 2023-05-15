@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bunrouter"
+	"golang.org/x/oauth2"
 )
 
 // HTTPError represents HTTP error record
@@ -182,6 +183,23 @@ func formData(r *http.Request) bool {
 	return false
 }
 
+// gologinHandler provides wrapper for gologin handlers
+// it gets HTTP request referrer and adds this information to oauth2 RedirectURL
+func gologinHandler(config *oauth2.Config, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// get HTTP request referrer
+		referer := r.Referer()
+		if referer != "" && strings.Contains(referer, "redirect=") {
+			// modify oauth config RedirectURL with our referrer value
+			arr := strings.Split(referer, "redirect=")
+			api := arr[1]
+			config.RedirectURL = fmt.Sprintf("%s?redirect=%s", config.RedirectURL, api)
+		}
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 // FaviconHandler
 func FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, fmt.Sprintf("%s/images/favicon.ico", Config.StaticDir))
@@ -289,6 +307,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 // helper function to check user's authorization
 func checkAuthz(tmpl TmplRecord, w http.ResponseWriter, r *http.Request) error {
+	// set original request URI
 	authz := r.Header.Get("Authorization")
 	// get our session cookies
 	session, err := sessionStore.Get(r, sessionName)
@@ -330,18 +349,19 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// user HTTP call should present either valid token or it will be
 	// redirected to /login end-point
 	if err = checkAuthz(tmpl, w, r); err != nil {
+		rpath := fmt.Sprintf("/login?redirect=%s", r.URL.Path)
 		// get our session cookies
 		session, err := sessionStore.Get(r, sessionName)
 		if err != nil {
 			log.Printf("UploadHandler, session %s redirect due to error %v", sessionName, err)
-			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			http.Redirect(w, r, rpath, http.StatusTemporaryRedirect)
 			return
 		}
 		// check if ser has been authenticated with any OAuth providers
 		user, ok := session.GetOk(sessionUserName)
 		if !ok {
 			log.Printf("UploadHandler, unable to identify username due to error %v", err)
-			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			http.Redirect(w, r, rpath, http.StatusTemporaryRedirect)
 			return
 		}
 		userID, _ := session.GetOk(sessionUserID)
@@ -603,18 +623,19 @@ func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	// user HTTP call should present either valid token or it will be
 	// redirected to /login end-point
 	if err := checkAuthz(tmpl, w, r); err != nil {
+		rpath := fmt.Sprintf("/login?redirect=%s", r.URL.Path)
 		// get our session cookies
 		session, err := sessionStore.Get(r, sessionName)
 		if err != nil {
 			log.Printf("InferenceHandler, session %s redirect due to error %v", sessionName, err)
-			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			http.Redirect(w, r, rpath, http.StatusTemporaryRedirect)
 			return
 		}
 		// check if ser has been authenticated with any OAuth providers
 		user, ok := session.GetOk(sessionUserName)
 		if !ok {
 			log.Printf("InferenceHandler, unable to identify username due to error %v", err)
-			http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
+			http.Redirect(w, r, rpath, http.StatusTemporaryRedirect)
 			return
 		}
 		userID, _ := session.GetOk(sessionUserID)
