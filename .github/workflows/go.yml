@@ -1,4 +1,4 @@
-name: Go CI build
+name: Go CI/CD build
 
 on:
   push:
