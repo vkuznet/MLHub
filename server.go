@@ -83,9 +83,15 @@ func bunRouter() *bunrouter.CompatRouter {
 
 	// auth end-points
 	// github OAuth routes
+	var arec OAuthRecord
+	var err error
+	arec, err = Config.Credentials("github")
+	if err != nil {
+		log.Println("WARNING:", err)
+	}
 	config := &oauth2.Config{
-		ClientID:     Config.ClientID,
-		ClientSecret: Config.ClientSecret,
+		ClientID:     arec.ClientID,
+		ClientSecret: arec.ClientSecret,
 		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/github/callback", Config.Port, Config.Base),
 		Endpoint:     githubOAuth2.Endpoint,
 	}
@@ -101,15 +107,19 @@ func bunRouter() *bunrouter.CompatRouter {
 	router.Router.GET(base+"/github/callback", bunrouter.HTTPHandler(githubCallback))
 
 	// google OAuth routes
+	arec, err = Config.Credentials("google")
+	if err != nil {
+		log.Println("WARNING:", err)
+	}
 	config = &oauth2.Config{
-		ClientID:     Config.ClientID,
-		ClientSecret: Config.ClientSecret,
+		ClientID:     arec.ClientID,
+		ClientSecret: arec.ClientSecret,
 		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/google/callback", Config.Port, Config.Base),
 		Endpoint:     googleOAuth2.Endpoint,
 		Scopes:       []string{"profile", "email"},
 	}
-	googleLogin := google.StateHandler(stateConfig, google.LoginHandler(config, nil))
-	googleCallback := google.StateHandler(stateConfig, google.CallbackHandler(config, issueSession("google"), nil))
+	googleLogin := gologinHandler(config, google.StateHandler(stateConfig, google.LoginHandler(config, nil)))
+	googleCallback := gologinHandler(config, google.StateHandler(stateConfig, google.CallbackHandler(config, issueSession("google"), nil)))
 	router.Router.GET(base+"/google/login", bunrouter.HTTPHandler(googleLogin))
 	router.Router.GET(base+"/google/callback", bunrouter.HTTPHandler(googleCallback))
 
