@@ -31,9 +31,7 @@ type Configuration struct {
 	StaticDir string `json:"static_dir"` // speficy static dir location
 
 	// OAuth parts
-	OAuth        []OAuthRecord `json:"oauth"`         // oauth configurations
-	ClientID     string        `json:"client_id"`     // client id
-	ClientSecret string        `json:"client_secret"` // client secret
+	OAuth []OAuthRecord `json:"oauth"` // oauth configurations
 
 	// proxy parts
 	XForwardedHost      string `json:"X-Forwarded-Host"`       // X-Forwarded-Host field of HTTP request
