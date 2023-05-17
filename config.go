@@ -7,11 +7,19 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 )
+
+// OAuthRecord defines OAuth provider's credentials
+type OAuthRecord struct {
+	Provider     string `json:"provider"`      // name of the provider
+	ClientID     string `json:"client_id"`     // client id
+	ClientSecret string `json:"client_secret"` // client secret
+}
 
 // Configuration stores server configuration parameters
 type Configuration struct {
@@ -23,9 +31,9 @@ type Configuration struct {
 	StaticDir string `json:"static_dir"` // speficy static dir location
 
 	// OAuth parts
-	OAuthHost    string `json:"oauth_host"`    // OAuthHost name
-	ClientID     string `json:"client_id"`     // client id
-	ClientSecret string `json:"client_secret"` // client secret
+	OAuth        []OAuthRecord `json:"oauth"`         // oauth configurations
+	ClientID     string        `json:"client_id"`     // client id
+	ClientSecret string        `json:"client_secret"` // client secret
 
 	// proxy parts
 	XForwardedHost      string `json:"X-Forwarded-Host"`       // X-Forwarded-Host field of HTTP request
@@ -46,6 +54,17 @@ type Configuration struct {
 
 	// storage parts
 	StorageDir string `json:"storage_dir"` // storage directory
+}
+
+// Credentials returns provider OAuth credential record
+func (c Configuration) Credentials(provider string) (OAuthRecord, error) {
+	for _, rec := range c.OAuth {
+		if rec.Provider == provider {
+			return rec, nil
+		}
+	}
+	msg := fmt.Sprintf("No OAuth provider %s is found", provider)
+	return OAuthRecord{}, errors.New(msg)
 }
 
 // Config variable represents configuration object
