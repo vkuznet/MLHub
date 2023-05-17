@@ -11,15 +11,18 @@ import (
 
 	"github.com/uptrace/bunrouter"
 
+	facebook "github.com/dghubble/gologin/v2/facebook"
+	facebookOAuth2 "golang.org/x/oauth2/facebook"
+
 	gologin "github.com/dghubble/gologin/v2"
 	"github.com/dghubble/gologin/v2/github"
 	"golang.org/x/oauth2"
 	githubOAuth2 "golang.org/x/oauth2/github"
 
 	google "github.com/dghubble/gologin/v2/google"
-	twitter "github.com/dghubble/gologin/v2/twitter"
-	oauth1 "github.com/dghubble/oauth1"
-	twitterOAuth1 "github.com/dghubble/oauth1/twitter"
+	//     twitter "github.com/dghubble/gologin/v2/twitter"
+
+	//     twitterOAuth1 "github.com/dghubble/oauth1/twitter"
 	googleOAuth2 "golang.org/x/oauth2/google"
 )
 
@@ -116,24 +119,42 @@ func bunRouter() *bunrouter.CompatRouter {
 		ClientSecret: arec.ClientSecret,
 		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/google/callback", Config.Port, Config.Base),
 		Endpoint:     googleOAuth2.Endpoint,
-		Scopes:       []string{"profile", "email"},
+		//         Scopes:       []string{"profile", "email"},
 	}
 	googleLogin := gologinHandler(config, google.StateHandler(stateConfig, google.LoginHandler(config, nil)))
 	googleCallback := gologinHandler(config, google.StateHandler(stateConfig, google.CallbackHandler(config, issueSession("google"), nil)))
 	router.Router.GET(base+"/google/login", bunrouter.HTTPHandler(googleLogin))
 	router.Router.GET(base+"/google/callback", bunrouter.HTTPHandler(googleCallback))
 
-	// twitter OAuth routes
-	config1 := &oauth1.Config{
-		ConsumerKey:    Config.ClientID,
-		ConsumerSecret: Config.ClientSecret,
-		CallbackURL:    fmt.Sprintf("http://localhost:%d%s/twitter/callback", Config.Port, Config.Base),
-		Endpoint:       twitterOAuth1.AuthorizeEndpoint,
+	// facebook OAuth routes
+	arec, err = Config.Credentials("facebook")
+	if err != nil {
+		log.Println("WARNING:", err)
 	}
-	twitterLogin := twitter.LoginHandler(config1, nil)
-	twitterCallback := twitter.CallbackHandler(config1, issueSession("twitter"), nil)
-	router.Router.GET(base+"/twitter/login", bunrouter.HTTPHandler(twitterLogin))
-	router.Router.GET(base+"/twitter/callback", bunrouter.HTTPHandler(twitterCallback))
+	config = &oauth2.Config{
+		ClientID:     arec.ClientID,
+		ClientSecret: arec.ClientSecret,
+		RedirectURL:  fmt.Sprintf("http://localhost:%d%s/facebook/callback", Config.Port, Config.Base),
+		Endpoint:     facebookOAuth2.Endpoint,
+	}
+	facebookLogin := gologinHandler(config, facebook.StateHandler(stateConfig, facebook.LoginHandler(config, nil)))
+	facebookCallback := gologinHandler(config, facebook.StateHandler(stateConfig, facebook.CallbackHandler(config, issueSession("facebook"), nil)))
+	router.Router.GET(base+"/facebook/login", bunrouter.HTTPHandler(facebookLogin))
+	router.Router.GET(base+"/facebook/callback", bunrouter.HTTPHandler(facebookCallback))
+
+	/*
+		// twitter OAuth routes
+		config1 := &oauth1.Config{
+			ConsumerKey:    Config.ClientID,
+			ConsumerSecret: Config.ClientSecret,
+			CallbackURL:    fmt.Sprintf("http://localhost:%d%s/twitter/callback", Config.Port, Config.Base),
+			Endpoint:       twitterOAuth1.AuthorizeEndpoint,
+		}
+		twitterLogin := twitter.LoginHandler(config1, nil)
+		twitterCallback := twitter.CallbackHandler(config1, issueSession("twitter"), nil)
+		router.Router.GET(base+"/twitter/login", bunrouter.HTTPHandler(twitterLogin))
+		router.Router.GET(base+"/twitter/callback", bunrouter.HTTPHandler(twitterCallback))
+	*/
 
 	router.GET(base+"/login", LoginHandler)
 	router.GET(base+"/access", AccessHandler)
