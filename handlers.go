@@ -353,7 +353,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	// user HTTP call should present either valid token or it will be
 	// redirected to /login end-point
 	if err = checkAuthz(tmpl, w, r); err != nil {
-		rpath := fmt.Sprintf("/login?redirect=%s", r.URL.Path)
+		rpath := fmt.Sprintf("%s/login?redirect=%s", Config.Base, r.URL.Path)
 		// get our session cookies
 		session, err := sessionStore.Get(r, sessionName)
 		if err != nil {
@@ -529,7 +529,7 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 	// user HTTP call should present either valid token or it will be
 	// redirected to /login end-point
 	if err := checkAuthz(tmpl, w, r); err != nil {
-		rpath := fmt.Sprintf("/login?redirect=%s", r.URL.Path)
+		rpath := fmt.Sprintf("%s/login?redirect=%s", Config.Base, r.URL.Path)
 		// get our session cookies
 		session, err := sessionStore.Get(r, sessionName)
 		if err != nil {
@@ -668,7 +668,7 @@ func InferenceHandler(w http.ResponseWriter, r *http.Request) {
 	// user HTTP call should present either valid token or it will be
 	// redirected to /login end-point
 	if err := checkAuthz(tmpl, w, r); err != nil {
-		rpath := fmt.Sprintf("/login?redirect=%s", r.URL.Path)
+		rpath := fmt.Sprintf("%s/login?redirect=%s", Config.Base, r.URL.Path)
 		// get our session cookies
 		session, err := sessionStore.Get(r, sessionName)
 		if err != nil {
