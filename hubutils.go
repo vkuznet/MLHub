@@ -254,12 +254,20 @@ func modelRecord(r *http.Request) (Record, error) {
 		log.Printf("ERROR: %s, HTTP request %+v", msg, r)
 		return rec, errors.New(msg)
 	}
+	version, _ := params.Map()["version"]
+	if version == "" {
+		version = r.FormValue("version")
+	}
+	mtype, _ := params.Map()["type"]
+	if mtype == "" {
+		mtype = r.FormValue("mtype")
+	}
 
 	if Config.Verbose > 0 {
-		log.Printf("get ML model %s meta-data", model)
+		log.Printf("get meta-data for model=%s type=%s version=%s", model, mtype, version)
 	}
 	// get ML meta-data
-	records, err := metadata.Records(rec.Model, rec.Type, rec.Version)
+	records, err := metadata.Records(model, mtype, version)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get meta-data, error=%v", err)
 		return rec, errors.New(msg)
