@@ -228,6 +228,10 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 		httpError(w, r, tmpl, BadRequest, err, http.StatusBadRequest)
 		return
 	}
+	if Config.Verbose > 0 {
+		log.Printf("InferenceHandler found %+v", rec)
+		log.Printf("InferenceHandler existing ML backends %+v", Config.MLBackends)
+	}
 	if backend, ok := Config.MLBackends[rec.Type]; ok {
 		path := r.RequestURI
 		bPath := strings.Replace(path, fmt.Sprintf("/model/%s", rec.Model), "", -1)
@@ -251,7 +255,7 @@ func PredictHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		msg := fmt.Sprintf("no ML backed record found for %s", rec.Type)
+		msg := fmt.Sprintf("no ML backend record found for %s", rec.Type)
 		httpError(w, r, tmpl, BadRequest, errors.New(msg), http.StatusBadRequest)
 		return
 	}
