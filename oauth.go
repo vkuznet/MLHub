@@ -23,7 +23,7 @@ const (
 	sessionUserID   = "MLHub-UserID"
 	sessionUserName = "MLHub-UserName"
 	sessionToken    = "MLHub-Token"
-	sessionProvider = "MLHun-Provider"
+	sessionProvider = "MLHub-Provider"
 )
 
 // sessionStore encodes and decodes session data stored in signed cookies
